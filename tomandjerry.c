@@ -62,7 +62,7 @@ struct character
 // Global variables
 double walls[50][4];
 double walls_scaled[50][4];
-double wall_pixels[5000][3]; // Used to store coords of known wall pixels (temp high number)
+double wall_pixels[1000][2]; // Used to store coords of known wall pixels 
 
 
 void scale_walls()
@@ -102,22 +102,27 @@ void calc_wall_pixels()
     int pixel_count = 0;
     for(int l = 0; l != 50; l++)
     {
-        double x1 = walls_scaled[l][0];
-        double y1 = walls_scaled[l][1];
-        double x2 = walls_scaled[l][2];
-        double y2 = walls_scaled[l][3];
+        int x1 = walls_scaled[l][0];
+        int y1 = walls_scaled[l][1];
+        int x2 = walls_scaled[l][2];
+        int y2 = walls_scaled[l][3];
 
-        wall_pixels[pixel_count][0] = 0;
+        wall_pixels[pixel_count][0] = 0; // x
+        wall_pixels[pixel_count][1] = 0; // y
 
         if(x1 == x2)
         {
             int y_min = MIN(y1, y2),y_max = MAX(y1, y2);
+            int fuckthis = 5;
             for(int i = y_min; i <= y_max; i++)
             {
                 wall_pixels[pixel_count][0] = x1;
                 wall_pixels[pixel_count][1] = i;
+                draw_int(0, fuckthis, i);
+                draw_int(3, fuckthis, x1);
                 draw_char(x1, i, 'Y');
                 pixel_count++;
+                fuckthis++;
             }
         }
         else if(y1 == y2)
@@ -176,9 +181,16 @@ void collision_wall()
     {
         if(wall_pixels[i][0] != 0)
         {
-            draw_int(22, 11, jerry.x - wall_pixels[i][1]);
-            draw_int(22, 11, jerry.y - wall_pixels[i][0]);
-            if(jerry.x == wall_pixels[i][0] && wall_pixels[i][1] == jerry.y) draw_formatted(5, 3, "X: %d", wall_pixels[i]); // detects wall X + d + v (diagonal)
+            if(jerry.x == wall_pixels[i][0] && wall_pixels[i][1] == jerry.y)
+            {
+                draw_int(5, 4, wall_pixels[i][0]);
+                draw_int(5, 5, wall_pixels[i][1]);
+            }
+            else if (wall_pixels[i][1] == jerry.y && jerry.x == wall_pixels[i][0])
+            {
+                draw_int(5, 4, wall_pixels[i][0]);
+                draw_int(5, 5, wall_pixels[i][1]);
+            }
         }
     }
 }
