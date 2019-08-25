@@ -1,0 +1,38 @@
+{
+    "version": "2.0.0",
+    "tasks": 
+    [
+        {
+            "type": "shell",
+            "label": "gcc.exe build active file",
+            "command": "gcc",
+            "args":
+            [
+                "-g",
+                "${fileBasename}",
+                "-o",
+                "${fileBasenameNoExtension}",
+                "-Wall",
+                "-Werror",
+                "-L../ZDK",
+                "-I../ZDK",
+                "-lzdk",
+                "-lm",
+                "-lncurses"
+            ],
+            "options":
+            {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher":
+            [
+                "$gcc"
+            ],
+            "group":
+            {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

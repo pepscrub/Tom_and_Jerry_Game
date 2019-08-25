@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "Cygwin-GCC",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/../ZDK"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "defines": [],
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-x64"
+        }
+    ],
+    "version": 4
+}
