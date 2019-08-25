@@ -113,16 +113,11 @@ void calc_wall_pixels()
         if(x1 == x2)
         {
             int y_min = MIN(y1, y2),y_max = MAX(y1, y2);
-            int fuckthis = 5;
             for(int i = y_min; i <= y_max; i++)
             {
                 wall_pixels[pixel_count][0] = x1;
                 wall_pixels[pixel_count][1] = i;
-                draw_int(0, fuckthis, i);
-                draw_int(3, fuckthis, x1);
-                draw_char(x1, i, 'Y');
                 pixel_count++;
-                fuckthis++;
             }
         }
         else if(y1 == y2)
@@ -132,7 +127,6 @@ void calc_wall_pixels()
             {
                 wall_pixels[pixel_count][0] = i;
                 wall_pixels[pixel_count][1] = y1;
-                draw_char(i, y1, 'X');
                 pixel_count++;
             }
         }
@@ -158,11 +152,9 @@ void calc_wall_pixels()
             for (int x = x1, y = y1; (dx > 0) ? x <= x2 : x >= x2; (dx > 0) ? x++ : x--) {
                 wall_pixels[pixel_count][0] = x;
                 wall_pixels[pixel_count][1] = y;
-                draw_char(x, y, 'D');
                 err += derr;
                 pixel_count++;
                 while (err >= 0.5 && ((dy > 0) ? y <= y2 : y >= y2)) {
-                    draw_char(x, y, 'V');
                     wall_pixels[pixel_count][0] = x;
                     wall_pixels[pixel_count][1] = y;
                     y += (dy > 0) - (dy < 0);
@@ -174,23 +166,17 @@ void calc_wall_pixels()
     }
 }
 
-void collision_wall()
+void collision_wall( char key )
 {
     calc_wall_pixels();
     for(int i = 0; i != 5000; i++)
     {
         if(wall_pixels[i][0] != 0)
         {
-            if(jerry.x == wall_pixels[i][0] && wall_pixels[i][1] == jerry.y)
-            {
-                draw_int(5, 4, wall_pixels[i][0]);
-                draw_int(5, 5, wall_pixels[i][1]);
-            }
-            else if (wall_pixels[i][1] == jerry.y && jerry.x == wall_pixels[i][0])
-            {
-                draw_int(5, 4, wall_pixels[i][0]);
-                draw_int(5, 5, wall_pixels[i][1]);
-            }
+            if(key == 'a' && jerry.x - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x++;
+            if(key == 'd' && jerry.x + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x--;
+            if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y++;
+            if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y--;
         }
     }
 }
@@ -292,6 +278,8 @@ void controller( void )
     int key = get_char();
     if(game.wall) return;
 
+    collision_wall( key );
+
     if(key == 'a' && jerry.x - 1 >= game.ob_x) jerry.x--;
     else if (key == 'd' && jerry.x + 1 < game.W) jerry.x++;
     else if (key == 'w' && jerry.y - 1 >= game.ob_y) jerry.y--;
@@ -363,7 +351,6 @@ void loop(void)
     draw_wall();
     controller();
     tom_ob_check();
-    collision_wall();
     // tom_ai();
 
 
