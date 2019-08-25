@@ -107,6 +107,8 @@ void calc_wall_pixels()
         double x2 = walls_scaled[l][2];
         double y2 = walls_scaled[l][3];
 
+        wall_pixels[pixel_count][0] = 0;
+
         if(x1 == x2)
         {
             int y_min = MIN(y1, y2),y_max = MAX(y1, y2);
@@ -124,7 +126,7 @@ void calc_wall_pixels()
             for(int i = x_min; i <= x_max; i++)
             {
                 wall_pixels[pixel_count][0] = i;
-                wall_pixels[pixel_count][0] = y1;
+                wall_pixels[pixel_count][1] = y1;
                 draw_char(i, y1, 'X');
                 pixel_count++;
             }
@@ -150,14 +152,14 @@ void calc_wall_pixels()
 
             for (int x = x1, y = y1; (dx > 0) ? x <= x2 : x >= x2; (dx > 0) ? x++ : x--) {
                 wall_pixels[pixel_count][0] = x;
-                wall_pixels[pixel_count][0] = y;
+                wall_pixels[pixel_count][1] = y;
                 draw_char(x, y, 'D');
                 err += derr;
                 pixel_count++;
                 while (err >= 0.5 && ((dy > 0) ? y <= y2 : y >= y2)) {
                     draw_char(x, y, 'V');
                     wall_pixels[pixel_count][0] = x;
-                    wall_pixels[pixel_count][0] = y;
+                    wall_pixels[pixel_count][1] = y;
                     y += (dy > 0) - (dy < 0);
                     err -= 1.0;
                     pixel_count++;
@@ -174,12 +176,9 @@ void collision_wall()
     {
         if(wall_pixels[i][0] != 0)
         {
-            if((jerry.x + 1) == wall_pixels[i][0]) draw_char(5, 3, '!');
-            if((jerry.y + 1) == wall_pixels[i][1]) draw_char(5, 4, '!');
-            if((jerry.x - 1) == wall_pixels[i][0]) draw_char(5, 5, '!');
-            if((jerry.y - 1) == wall_pixels[i][1]) draw_char(5, 6, '!');
-            draw_int(20, i+6, wall_pixels[i][0]);
-            draw_int(26, i+6, wall_pixels[i][1]);
+            draw_int(22, 11, jerry.x - wall_pixels[i][1]);
+            draw_int(22, 11, jerry.y - wall_pixels[i][0]);
+            if(jerry.x == wall_pixels[i][0] && wall_pixels[i][1] == jerry.y) draw_formatted(5, 3, "X: %d", wall_pixels[i]); // detects wall X + d + v (diagonal)
         }
     }
 }
@@ -353,7 +352,7 @@ void loop(void)
     controller();
     tom_ob_check();
     collision_wall();
-    tom_ai();
+    // tom_ai();
 
 
     draw_char(jerry.x, jerry.y, jerry.img);
