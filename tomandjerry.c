@@ -169,61 +169,44 @@ void calc_wall_pixels()
     }
 }
 
+int tom_wall ( double wall_x, double wall_y )
+{
+    int t = 0;
+    if(round(tom.x - 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x + 1), t = 1; // left 
+    if(round(tom.x + 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x - 1), t = 1; // right
+    if(round(tom.y - 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y + 1), t = 1; // above
+    if(round(tom.y + 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y - 1), t = 1; // below
+    return t;
+}
+
 void tom_ai( double wall_x, double wall_y )
 {
-
-    int near_wall = 0;
 
     /*
         Wall collision preventing movement
         TODO: Randomize movements with wall hit
     */
-    if(round(tom.x - 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x + 1), near_wall = 1; // left 
-    if(round(tom.x + 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x - 1), near_wall = 1; // right
-    if(round(tom.y - 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y + 1), near_wall = 1; // above
-    if(round(tom.y + 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y - 1), near_wall = 1; // below
+    int near_wall = tom_wall(wall_x, wall_y);
 
-    if(near_wall)
+    if(!near_wall)
     {
-        
-    }
-    else
-    {
+        int dx,dy;
+        dx = jerry.x - tom.x;
+        dy = jerry.y - tom.y;
+
         if( round(jerry.x) == round(tom.x) && round(tom.y) <= round(jerry.y) )           tom.y = TOMCALC(tom.y, tom.speed, 0),near_wall = 0;
         else if( round(jerry.x) == round(tom.x) && round(tom.y) > round(jerry.y)  )      tom.y = TOMCALC(tom.y, tom.speed, 1),near_wall = 0;
         else if( round(jerry.y) == round(tom.y) && round(tom.x) <= round(jerry.x) )      tom.x = TOMCALC(tom.x, tom.speed, 0),near_wall = 0;
         else if( round(jerry.y) == round(tom.y) && round(tom.x) > round(jerry.x)  )      tom.x = TOMCALC(tom.x, tom.speed, 1),near_wall = 0;
         else
         {
-            int x1,y1,x2,y2;
-            x1 = round(tom.x);
-            y1 = round(tom.y);
-            x2 = round(jerry.x);
-            y2 = round(jerry.y);
-
-            int dx = x1 - x2;
-            int dy = y1 - y2;
-
-            if(x1 < x2) // Tom is to the left of Jerry
-            {
-                x1 = round(jerry.x);
-                y1 = round(jerry.y);
-                x2 = round(tom.x);
-                y2 = round(tom.y);
-            }
-            int derr = abs(dy / dx);
-            int error = 0;
-            for(int i = x1; i < x2; i++)
-            {
-                tom.x++;
-                error = error + derr;
-                if(error >= .5)
-                {
-                    tom.y = y1 + sin(dy) * 1;
-                }
-            }
+            if ( dx < 0 ) tom.x = TOMCALC(tom.x, tom.speed, 1),near_wall = 0;
+            if ( dx > 0 ) tom.x = TOMCALC(tom.x, tom.speed, 0),near_wall = 0;
+            if ( dy < 0 ) tom.y = TOMCALC(tom.y, tom.speed, 1),near_wall = 0;
+            if ( dy > 0 ) tom.y = TOMCALC(tom.y, tom.speed, 0),near_wall = 0;
         }
     }
+
     
 
     // Attempt to add radomized movements to jerry
@@ -402,7 +385,6 @@ void loop(void)
     draw_wall();
     controller();
     tom_ob_check();
-    // tom_ai();
 
 
     draw_char(jerry.x, jerry.y, jerry.img);
