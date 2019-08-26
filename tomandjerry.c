@@ -13,11 +13,12 @@
 #define MAX_ITEMS (100)
 #define BUFFER 50
 #define SPEED 1
+#define PIXELCOUNT 1000
 
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 #define MAX(x,y) (((x) > (y)) ? (x) : (y))
 #define ABS(x)	 (((x) >= 0) ? (x) : -(x))
-#define TOMCALC(c,s,t) (t == 0 ? (c + (s / (10 * 1000)) ) : (c - (s / (10 * 1000)) ) )
+#define TOMCALC(c,s,t) (t == 0 ? (c + (s / (10 * PIXELCOUNT)) ) : (c - (s / (10 * PIXELCOUNT)) ) )
 
 struct game_logic
 {
@@ -60,13 +61,14 @@ struct character
     double speed;
     double x,y;
     char img;
+    int wall;
     int health;
 } jerry, tom;
 
 // Global variables
 double walls[50][4];
 double walls_scaled[50][4];
-double wall_pixels[1000][2];
+double wall_pixels[PIXELCOUNT][2];
 
 
 void scale_walls()
@@ -206,6 +208,13 @@ void tom_ai( double wall_x, double wall_y )
             if ( dy > 0 ) tom.y = TOMCALC(tom.y, tom.speed, 0),near_wall = 0;
         }
     }
+    else
+    {
+        tom.wall = 1;
+        tom.x = 10;
+        tom.y = 50;
+    }
+    
 
     
 
@@ -222,7 +231,7 @@ void collision_wall( char key )
     // Currently in-effient design but works non the less
     // * dynamically create a struct variable instead of an array?
     calc_wall_pixels();
-    for(int i = 0; i != 5000; i++)
+    for(int i = 0; i != PIXELCOUNT; i++)
     {
         if(wall_pixels[i][0] != 0)
         {
