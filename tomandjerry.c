@@ -17,6 +17,7 @@
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 #define MAX(x,y) (((x) > (y)) ? (x) : (y))
 #define ABS(x)	 (((x) >= 0) ? (x) : -(x))
+#define TOMCALC(c,s,t) (t == 0 ? (c + (s / (10 * 1000)) ) : (c - (s / (10 * 1000)) ) )
 
 struct game_logic
 {
@@ -50,7 +51,10 @@ struct game_logic
     bool wall;
 } game;
 
-// Setting up character variable here acts like a global var
+/*
+    Contains struct for both jerry and toms x,y speed and global vars that need
+    ready access.
+*/
 struct character
 {
     double speed;
@@ -62,7 +66,7 @@ struct character
 // Global variables
 double walls[50][4];
 double walls_scaled[50][4];
-double wall_pixels[1000][2]; // Used to store coords of known wall pixels 
+double wall_pixels[1000][2];
 
 
 void scale_walls()
@@ -83,13 +87,13 @@ void scale_walls()
 
 void status_bar()
 {
+    // Surely there's a cleaner way to do this?
     double margin = (game.W - 9.5) / 4;
     draw_formatted(0,0,"Student Number: 10407642");
     draw_formatted(margin,0,"Score: %d", game.score);
     draw_formatted(margin*2,0,"Lives: %d", game.lives);
     draw_formatted(margin*3,0,"Player: %c", jerry.img);
     draw_formatted(margin*4,0,"Time 00:00", game.time);
-    // Second bar
     draw_formatted(0,1,"Cheese: %d", game.c_active);
     draw_formatted(margin,1,"Traps: %d", game.mt_active);
     draw_formatted(margin*2,1,"Fireworks: %d", game.fw_active);
@@ -102,13 +106,16 @@ void calc_wall_pixels()
     int pixel_count = 0;
     for(int l = 0; l != 50; l++)
     {
+        // Initializing the array with 0 to detect later
+        wall_pixels[pixel_count][0] = 0;
+        wall_pixels[pixel_count][1] = 0;
+
         int x1 = walls_scaled[l][0];
         int y1 = walls_scaled[l][1];
         int x2 = walls_scaled[l][2];
         int y2 = walls_scaled[l][3];
 
-        wall_pixels[pixel_count][0] = 0; // x
-        wall_pixels[pixel_count][1] = 0; // y
+        // Basically the same code from the Wall drawer
 
         if(x1 == x2)
         {
@@ -140,14 +147,10 @@ void calc_wall_pixels()
                 y1 = y2;
                 y2 = t;
             }
-
-            // Use the Bresenham algorithm to render the line.
-            // TODO: Convert to an integer-only implementation such as
-            // https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-            float dx = x2 - x1;
-            float dy = y2 - y1;
-            float err = 0.0;
-            float derr = ABS(dy / dx);
+            double dx = x2 - x1;
+            double dy = y2 - y1;
+            double err = 0.0;
+            double derr = ABS(dy / dx);
 
             for (int x = x1, y = y1; (dx > 0) ? x <= x2 : x >= x2; (dx > 0) ? x++ : x--) {
                 wall_pixels[pixel_count][0] = x;
@@ -166,17 +169,88 @@ void calc_wall_pixels()
     }
 }
 
+void tom_ai( double wall_x, double wall_y )
+{
+
+    int near_wall = 0;
+
+    /*
+        Wall collision preventing movement
+        TODO: Randomize movements with wall hit
+    */
+    if(round(tom.x - 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x + 1), near_wall = 1; // left 
+    if(round(tom.x + 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x - 1), near_wall = 1; // right
+    if(round(tom.y - 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y + 1), near_wall = 1; // above
+    if(round(tom.y + 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y - 1), near_wall = 1; // below
+
+    if(near_wall)
+    {
+        
+    }
+    else
+    {
+        if( round(jerry.x) == round(tom.x) && round(tom.y) <= round(jerry.y) )           tom.y = TOMCALC(tom.y, tom.speed, 0),near_wall = 0;
+        else if( round(jerry.x) == round(tom.x) && round(tom.y) > round(jerry.y)  )      tom.y = TOMCALC(tom.y, tom.speed, 1),near_wall = 0;
+        else if( round(jerry.y) == round(tom.y) && round(tom.x) <= round(jerry.x) )      tom.x = TOMCALC(tom.x, tom.speed, 0),near_wall = 0;
+        else if( round(jerry.y) == round(tom.y) && round(tom.x) > round(jerry.x)  )      tom.x = TOMCALC(tom.x, tom.speed, 1),near_wall = 0;
+        else
+        {
+            int x1,y1,x2,y2;
+            x1 = round(tom.x);
+            y1 = round(tom.y);
+            x2 = round(jerry.x);
+            y2 = round(jerry.y);
+
+            int dx = x1 - x2;
+            int dy = y1 - y2;
+
+            if(x1 < x2) // Tom is to the left of Jerry
+            {
+                x1 = round(jerry.x);
+                y1 = round(jerry.y);
+                x2 = round(tom.x);
+                y2 = round(tom.y);
+            }
+            int derr = abs(dy / dx);
+            int error = 0;
+            for(int i = x1; i < x2; i++)
+            {
+                tom.x++;
+                error = error + derr;
+                if(error >= .5)
+                {
+                    tom.y = y1 + sin(dy) * 1;
+                }
+            }
+        }
+    }
+    
+
+    // Attempt to add radomized movements to jerry
+
+    /*
+        Seeking mechanic
+        TODO: Add diagonal tracking and Wall Detection
+    */
+}
+
 void collision_wall( char key )
 {
+    // Currently in-effient design but works non the less
+    // * dynamically create a struct variable instead of an array?
     calc_wall_pixels();
     for(int i = 0; i != 5000; i++)
     {
         if(wall_pixels[i][0] != 0)
         {
+            // Using standalone ifs so multiple collisions work e.g. when the player is in a corner they can't phase through the corner
             if(key == 'a' && jerry.x - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x++;
             if(key == 'd' && jerry.x + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x--;
             if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y++;
             if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y--;
+
+            tom_ai( wall_pixels[i][0], wall_pixels[i][1]);
+
         }
     }
 }
@@ -252,26 +326,12 @@ void tom_setup()
 
 void tom_ob_check()
 {
-    if(tom.x < game.ob_x){tom.x++;return;}
-    if(tom.y < game.ob_y){tom.y++;return;}
-    if(tom.x > game.W) {tom.x--;return;} 
-    if(tom.y > game.H) {tom.y--;return;}
+    if(tom.x < game.ob_x){tom.x++;}
+    if(tom.y < game.ob_y){tom.y++;}
+    if(tom.x > game.W - 1) {tom.x = game.W - 1;} 
+    if(tom.y > game.H - 1) {tom.y = game.H - 1;}
 }
 
-void tom_ai()
-{
-    // Use double and round in checks
-    double dy = tom.y - jerry.y;
-    double dx = tom.x - jerry.x;
-
-    draw_int(10, 24, dx);
-    draw_int(10, 25, dy);
-
-    if(round(dy) > 0 && tom.y != 0) tom.y = tom.y - (tom.speed / 3);
-    else if(dy < 0 && tom.y != 0) tom.y = tom.y + (tom.speed / 3);
-    else if(round(dx) > 0 && tom.x != 0) tom.x = tom.x - (tom.speed / 3);
-    else if(dx < 0 && tom.x != 0) tom.x = tom.x + (tom.speed / 3);
-}
 
 void controller( void )
 {
@@ -330,14 +390,6 @@ void setup (void) {
 }
 
 
-void debugging()
-{
-    draw_int(10, 10, jerry.x);
-    draw_int(10, 11, jerry.y);
-
-    draw_int(10, 13, tom.x);
-    draw_int(10, 14, tom.y);
-}
 
 void loop(void) 
 {
@@ -345,7 +397,6 @@ void loop(void)
     game.W = screen_width();
     game.H = screen_height();
 
-    debugging();
 
     status_bar();
     draw_wall();
