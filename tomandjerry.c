@@ -48,6 +48,7 @@ struct game_logic
     int lives; // Lives remaining
     int min; // Timer min
     int sec; // Timer sec
+    int milsec; // Timer milliseconds
     int level;
 
     int W;
@@ -106,7 +107,7 @@ void status_bar()
     draw_formatted(margin,0,"Score: %d", game.score);
     draw_formatted(margin*2,0,"Lives: %d", game.lives);
     draw_formatted(margin*3,0,"Player: %c", jerry.img);
-    draw_formatted(margin*4,0,"Time:  %02llu", game.sec);
+    draw_formatted(margin*4,0,"Time %02d:%02d", game.min, game.sec);
     draw_formatted(0,1,"Cheese: %d", game.c_active);
     draw_formatted(margin,1,"Traps: %d", game.mt_active);
     draw_formatted(margin*2,1,"Fireworks: %d", game.fw_active);
@@ -393,6 +394,7 @@ void game_logic_setup ( void )
     game.lives = 5;
     game.min = 0;
     game.sec = 0;
+    game.milsec = 0;
 
     game.level = 0;
 
@@ -410,12 +412,17 @@ void setup ( void )
     status_bar();
 }
 
+/*
+    Timer calculation
+    Conditions:
+    - Game pause: false
+*/
 void timer( void )
 {
-    int milsec=0;
-    if( milsec == 60 ) game.sec=++;
-    if ( game.sec == 60 ) game.min++;
-    milsec++;
+    if ( game.pause ) return;
+    if ( game.milsec == 60 ) game.sec++, game.milsec = 0;
+    if ( game.sec == 60 ) game.min++, game.sec = 0;
+    game.milsec++;
 }
 
 
