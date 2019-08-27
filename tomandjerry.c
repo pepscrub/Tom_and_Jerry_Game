@@ -22,6 +22,10 @@
 #define TPOSCALC(c,s,t) (t == 0 ? (c + (s / (PIXELCOUNT)) ) : (c - (s / (PIXELCOUNT)) ) ) // C = current position, S = speed, T = Type (Type refers to either positive or negative of Jerrys coords)
 #define SCALEX(x) (x * game.W) // Scale wall point to screen resolution
 #define SCALEY(y) ((y * (game.H - game.ob_y)) + game.ob_y) // Scale wall point to resolution on Y (includes automatic scaling from the status bar)
+#define VSPAWN(x,y,wx,wy) (y == wy ? true : (x == wx ? true : false) )
+#define CRENDER(x, y, i) (x != 0 && y != 0 ? draw_char(x, y, i) : 0)
+
+
 
 /*
     Contains the vast majority of game mechanics and logic.
@@ -33,9 +37,9 @@ struct game_logic
     int score; // Current game score
     int loop_delay; // Game rendering delay
 
-    int c_active;
-    int c_interval;
-    int c_advance;
+    int c_active; // Cheese active elements
+    int c_interval; // Cheese interval for placing cheese
+    int c_advance; // Cheese max before next room loads 
 
     int mt_active;
     int mt_max;
@@ -48,6 +52,8 @@ struct game_logic
     int lives; // Lives remaining
     int min; // Timer min
     int sec; // Timer sec
+    int cpsec; // Previous second for cheese
+    int mtpsec;
     int milsec; // Timer milliseconds
     int level;
 
@@ -61,6 +67,12 @@ struct game_logic
     bool wall;
 } game;
 
+struct gObj
+{
+    int x;
+    int y;
+} c1, c2, c3, c4 ,c5, t1, t2 ,t3 ,t4, t5;
+
 /*
     Contains struct for both jerry and toms x,y speed and global vars that need
     ready access.
@@ -71,7 +83,6 @@ struct character
     double x,y;
     char img;
     int wall;
-    int health;
 } jerry, tom;
 
 
@@ -253,6 +264,78 @@ void tom_ai( double wall_x, double wall_y )
     }
 }
 
+void mt_place( int wx, int wy )
+{
+    if(game.sec % game.mt_interval == 0 && game.mtpsec != game.sec)
+    {
+        if(game.mt_active == 5) return;
+        game.mtpsec = game.sec;
+        if(t1.x == 0 && t1.y == 0) t1.x = tom.x, t1.y = tom.y;
+        else if(t1.x == 0 && t1.y == 0) t1.x = tom.x, t1.y = tom.y;
+        else if(t2.x == 0 && t2.y == 0) t2.x = tom.x, t2.y = tom.y;
+        else if(t3.x == 0 && t3.y == 0) t3.x = tom.x, t3.y = tom.y;
+        else if(t4.x == 0 && t4.y == 0) t4.x = tom.x, t4.y = tom.y;
+        game.mt_active++;
+    }
+}
+
+void mt_render( void )
+{
+    CRENDER(t1.x, t1.y, 'M');
+    CRENDER(t2.x, t2.y, 'M');
+    CRENDER(t3.x, t3.y, 'M');
+    CRENDER(t4.x, t4.y, 'M');
+    CRENDER(t5.x, t5.y, 'M');
+
+
+    if(jerry.x == t1.x && jerry.y == t1.y) game.score++, t1.x = 0, t1.y = 0, game.mt_active--;
+    if(jerry.x == t2.x && jerry.y == t2.y) game.score++, t2.x = 0, t2.y = 0, game.mt_active--;
+    if(jerry.x == t3.x && jerry.y == t3.y) game.score++, t3.x = 0, t3.y = 0, game.mt_active--;
+    if(jerry.x == t4.x && jerry.y == t4.y) game.score++, t4.x = 0, t4.y = 0, game.mt_active--;
+    if(jerry.x == t5.x && jerry.y == t5.y) game.score++, t5.x = 0, t5.y = 0, game.mt_active--;
+}
+
+void cheese_place( int wx, int wy )
+{
+    if(game.sec % game.c_interval == 0 && game.cpsec != game.sec)
+    {
+        if(game.c_active == 5) return;
+        game.cpsec = game.sec;
+        int x,y;
+        x = rand() % screen_width();
+        y = rand() % screen_height();
+
+        while (VSPAWN(x, y, wx, wy))
+        {
+            x = rand() % screen_width();
+            y = rand() % screen_height();
+        }
+        if(c1.x == 0 && c1.y == 0) c1.x = x, c1.y = y;
+        else if(c2.x == 0 && c2.y == 0) c2.x = x, c2.y = y;
+        else if(c3.x == 0 && c3.y == 0) c3.x = x, c3.y = y;
+        else if(c4.x == 0 && c4.y == 0) c4.x = x, c4.y = y;
+        else if(c5.x == 0 && c5.y == 0) c5.x = x, c5.y = y;
+        game.c_active++;
+    }
+}
+
+void cheese_render()
+{
+    CRENDER(c1.x, c1.y, 'C');
+    CRENDER(c2.x, c2.y, 'C');
+    CRENDER(c3.x, c3.y, 'C');
+    CRENDER(c4.x, c4.y, 'C');
+    CRENDER(c5.x, c5.y, 'C');
+    // Cheese interactions
+    if(jerry.x == c1.x && jerry.y == c1.y) game.score++, c1.x = 0, c1.y = 0, game.c_active--;
+    if(jerry.x == c2.x && jerry.y == c2.y) game.score++, c2.x = 0, c2.y = 0, game.c_active--;
+    if(jerry.x == c3.x && jerry.y == c3.y) game.score++, c3.x = 0, c3.y = 0, game.c_active--;
+    if(jerry.x == c4.x && jerry.y == c4.y) game.score++, c4.x = 0, c4.y = 0, game.c_active--;
+    if(jerry.x == c5.x && jerry.y == c5.y) game.score++, c5.x = 0, c5.y = 0, game.c_active--;
+
+}
+
+
 void collision_wall( char key )
 {
     calc_wall_pixels();
@@ -266,6 +349,8 @@ void collision_wall( char key )
             if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y + jerry.speed;
             if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y - jerry.speed;
             tom_ai( wall_pixels[i][0], wall_pixels[i][1]); // Calling TOMS ai
+            cheese_place( wall_pixels[i][0], wall_pixels[i][1]); // Cheese location
+            mt_place( wall_pixels[i][0], wall_pixels[i][1]);
         }
     }
 }
@@ -323,7 +408,6 @@ void read_file(FILE*stream)
 void jerry_setup( void ) 
 {
     jerry.speed = 1;
-    jerry.health = 100;
 
     jerry.x = jerry.x * game.W;
     jerry.y = (jerry.y * game.H) + game.ob_y;
@@ -333,7 +417,6 @@ void jerry_setup( void )
 void tom_setup( void )
 {
     tom.speed = jerry.speed / 2;
-    tom.health = 100;
 
     tom.x = tom.x * game.W;
     tom.y = (tom.y * game.H) + game.ob_y;
@@ -402,8 +485,22 @@ void game_logic_setup ( void )
     game.W = screen_width();
     game.H = screen_height();
     game.wall = false; // Collision boolean
-}
 
+    c1.x = 0, c1.y = 0;
+    c2.x = 0, c2.y = 0;
+    c3.x = 0, c3.y = 0;
+    c4.x = 0, c4.y = 0;
+    c5.x = 0, c5.y = 0;
+
+    t1.x = 0, t1.y = 0;
+    t2.x = 0, t2.y = 0;
+    t3.x = 0, c3.y = 0;
+    t4.x = 0, t4.y = 0;
+    t5.x = 0, t5.y = 0;
+}
+/*
+    Initial game setup
+*/
 void setup ( void ) 
 {
     game_logic_setup();
@@ -411,6 +508,7 @@ void setup ( void )
     tom_setup();
     status_bar();
 }
+
 
 /*
     Timer calculation
@@ -438,6 +536,8 @@ void loop( void )
     controller();
     tom_ob_check();
     timer();
+    cheese_render();
+    mt_render();
 
     draw_char(jerry.x, jerry.y, jerry.img);
     draw_char(tom.x, tom.y, tom.img);
@@ -456,6 +556,7 @@ int main(int argc, char *argv[])
             fclose(stream);
         }
     }
+    srand( time(NULL) );
     setup_screen();
     setup();
 
