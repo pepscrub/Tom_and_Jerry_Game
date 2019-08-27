@@ -9,23 +9,30 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <time.h>
 
 #define MAX_ITEMS (100)
-#define BUFFER 50
-#define SPEED 1
-#define PIXELCOUNT 1000
+#define BUFFER 50;
+#define SPEED 1; // Default speed (directly affects BOTH Tom and Jerrys movement speed as well as Toms wall bounce)
+#define PIXELCOUNT 2500 // Maximum number of pixels for walls to render. CAREFUL this value directly affects Tom AI speed
 
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 #define MAX(x,y) (((x) > (y)) ? (x) : (y))
 #define ABS(x)	 (((x) >= 0) ? (x) : -(x))
-#define TOMCALC(c,s,t) (t == 0 ? (c + (s / (10 * PIXELCOUNT)) ) : (c - (s / (10 * PIXELCOUNT)) ) )
+#define TPOSCALC(c,s,t) (t == 0 ? (c + (s / (PIXELCOUNT)) ) : (c - (s / (PIXELCOUNT)) ) ) // C = current position, S = speed, T = Type (Type refers to either positive or negative of Jerrys coords)
+#define SCALEX(x) (x * game.W) // Scale wall point to screen resolution
+#define SCALEY(y) ((y * (game.H - game.ob_y)) + game.ob_y) // Scale wall point to resolution on Y (includes automatic scaling from the status bar)
 
+/*
+    Contains the vast majority of game mechanics and logic.
+*/
 struct game_logic
 {
-    bool g_over;
-    int score;
-    int loop_delay;
-    
+    bool g_over; // Game over / reset
+    bool pause; // Game pause mode
+    int score; // Current game score
+    int loop_delay; // Game rendering delay
+
     int c_active;
     int c_interval;
     int c_advance;
@@ -38,8 +45,9 @@ struct game_logic
     int fw_max;
     int fw_interval;
 
-    int lives;
-    int time;
+    int lives; // Lives remaining
+    int min; // Timer min
+    int sec; // Timer sec
     int level;
 
     int W;
@@ -65,37 +73,40 @@ struct character
     int health;
 } jerry, tom;
 
-// Global variables
-double walls[50][4];
-double walls_scaled[50][4];
-double wall_pixels[PIXELCOUNT][2];
 
 
+
+// 
+double walls[50][4]; // Walls initial position
+double walls_scaled[50][4]; // Walls scaled up to screen resolution
+double wall_pixels[PIXELCOUNT][2]; // Array holding x,y coordinate of each wall pixel. 0 = x, 1 = y
+
+/*
+    Generic function that scales the walls up to the screen resoultion
+*/
 void scale_walls()
 {
     for(int i = 0; i != 50; i++)
     {
         if(walls[i][0] * game.W != 0)
         {
-            walls_scaled[i][0] = walls[i][0] * game.W;
-            walls_scaled[i][1] = (walls[i][1] * (game.H - game.ob_y)) + game.ob_y;
-            walls_scaled[i][2] = walls[i][2] * game.W;
-            walls_scaled[i][3] = (walls[i][3] * (game.H - game.ob_y)) + game.ob_y;
+            walls_scaled[i][0] = SCALEX(walls[i][0]);
+            walls_scaled[i][1] = SCALEY(walls[i][1]);
+            walls_scaled[i][2] = SCALEX(walls[i][2]);
+            walls_scaled[i][3] = SCALEY(walls[i][3]);
         }
     }
 }
 
-
-
 void status_bar()
 {
-    // Surely there's a cleaner way to do this?
+    // * Surely there's a cleaner way to do this?
     double margin = (game.W - 9.5) / 4;
     draw_formatted(0,0,"Student Number: 10407642");
     draw_formatted(margin,0,"Score: %d", game.score);
     draw_formatted(margin*2,0,"Lives: %d", game.lives);
     draw_formatted(margin*3,0,"Player: %c", jerry.img);
-    draw_formatted(margin*4,0,"Time 00:00", game.time);
+    draw_formatted(margin*4,0,"Time:  %02llu", game.sec);
     draw_formatted(0,1,"Cheese: %d", game.c_active);
     draw_formatted(margin,1,"Traps: %d", game.mt_active);
     draw_formatted(margin*2,1,"Fireworks: %d", game.fw_active);
@@ -103,12 +114,17 @@ void status_bar()
     draw_line(0, 2, game.W, 2, '-');
 }
 
+/*
+    Calculates where all wall pixels are
+    - Could not use a check to see which pixels match the wall
+*/
 void calc_wall_pixels()
 {
     int pixel_count = 0;
     for(int l = 0; l != 50; l++)
     {
-        // Initializing the array with 0 to detect later
+        // Initializing the array with 0
+        // We parse out points from x0 + y0 later
         wall_pixels[pixel_count][0] = 0;
         wall_pixels[pixel_count][1] = 0;
 
@@ -121,6 +137,7 @@ void calc_wall_pixels()
 
         if(x1 == x2)
         {
+            // Count all the pixels on the Y coordinate between both points
             int y_min = MIN(y1, y2),y_max = MAX(y1, y2);
             for(int i = y_min; i <= y_max; i++)
             {
@@ -171,6 +188,11 @@ void calc_wall_pixels()
     }
 }
 
+/*
+    Checks to see if a wall is 1 pixel away from tom in all directions
+    returns: 1 (Wall detected)
+    returns: 0 (No Wall detected)
+*/
 int tom_wall ( double wall_x, double wall_y )
 {
     int t = 0;
@@ -181,68 +203,68 @@ int tom_wall ( double wall_x, double wall_y )
     return t;
 }
 
+/*
+    Calculates Tom seeking path and wall collision randomization
+    Called from Wall Collision loop
+    * Mostly complete pair some minor game improvements
+*/
 void tom_ai( double wall_x, double wall_y )
 {
-
-    /*
-        Wall collision preventing movement
-        TODO: Randomize movements with wall hit
-    */
     int near_wall = tom_wall(wall_x, wall_y);
-
+    if( game.pause ) return;
     if(!near_wall)
     {
-        int dx,dy;
-        dx = jerry.x - tom.x;
-        dy = jerry.y - tom.y;
-
-        if( round(jerry.x) == round(tom.x) && round(tom.y) <= round(jerry.y) )           tom.y = TOMCALC(tom.y, tom.speed, 0),near_wall = 0;
-        else if( round(jerry.x) == round(tom.x) && round(tom.y) > round(jerry.y)  )      tom.y = TOMCALC(tom.y, tom.speed, 1),near_wall = 0;
-        else if( round(jerry.y) == round(tom.y) && round(tom.x) <= round(jerry.x) )      tom.x = TOMCALC(tom.x, tom.speed, 0),near_wall = 0;
-        else if( round(jerry.y) == round(tom.y) && round(tom.x) > round(jerry.x)  )      tom.x = TOMCALC(tom.x, tom.speed, 1),near_wall = 0;
-        else
+        if(!tom.wall)
         {
-            if ( dx < 0 ) tom.x = TOMCALC(tom.x, tom.speed, 1),near_wall = 0;
-            if ( dx > 0 ) tom.x = TOMCALC(tom.x, tom.speed, 0),near_wall = 0;
-            if ( dy < 0 ) tom.y = TOMCALC(tom.y, tom.speed, 1),near_wall = 0;
-            if ( dy > 0 ) tom.y = TOMCALC(tom.y, tom.speed, 0),near_wall = 0;
+            int dx,dy;
+            dx = jerry.x - tom.x;
+            dy = jerry.y - tom.y;
+
+            if( round(jerry.x) == round(tom.x) && round(tom.y) <= round(jerry.y) )           tom.y = TPOSCALC(tom.y, tom.speed, 0),near_wall = 0;
+            else if( round(jerry.x) == round(tom.x) && round(tom.y) > round(jerry.y)  )      tom.y = TPOSCALC(tom.y, tom.speed, 1),near_wall = 0;
+            else if( round(jerry.y) == round(tom.y) && round(tom.x) <= round(jerry.x) )      tom.x = TPOSCALC(tom.x, tom.speed, 0),near_wall = 0;
+            else if( round(jerry.y) == round(tom.y) && round(tom.x) > round(jerry.x)  )      tom.x = TPOSCALC(tom.x, tom.speed, 1),near_wall = 0;
+            else // Line algroithim appeared to exibit the same behaviours as the code below
+            {
+                if ( dx < 0 ) tom.x = TPOSCALC(tom.x, tom.speed, 1),near_wall = 0;
+                if ( dx > 0 ) tom.x = TPOSCALC(tom.x, tom.speed, 0),near_wall = 0;
+                if ( dy < 0 ) tom.y = TPOSCALC(tom.y, tom.speed, 1),near_wall = 0;
+                if ( dy > 0 ) tom.y = TPOSCALC(tom.y, tom.speed, 0),near_wall = 0;
+            }
         }
     }
     else
     {
-        tom.wall = 1;
-        tom.x = 10;
-        tom.y = 50;
+            int js,ts,x,y;
+            js = jerry.speed;
+            // Tom speed needs to be rounded up to 1 so we can use rand()
+            ts = tom.speed <= 1 ? 1 : tom.speed;
+            // Fly window interaction
+            // x and y check to see if Jerry is left/right above/below the players current coordinate
+            // TODO: Add minmum distance based on Toms position and the nearest wall behind the teleport
+            // * Could also animate this process very easily
+            x = tom.x > jerry.x ? tom.x + rand() % 2 : tom.x - rand() % 2;
+            y = tom.y > jerry.y ? tom.y + rand() % 2 : tom.y - rand() % 2;
+
+            tom.x = TPOSCALC(x, rand() % (ts + js), (tom.x < jerry.x ? 0 : 1));
+            tom.y = TPOSCALC(y, rand() % (ts + js), (tom.y < jerry.y ? 0 : 1));
+            tom.wall = 0;
     }
-    
-
-    
-
-    // Attempt to add radomized movements to jerry
-
-    /*
-        Seeking mechanic
-        TODO: Add diagonal tracking and Wall Detection
-    */
 }
 
 void collision_wall( char key )
 {
-    // Currently in-effient design but works non the less
-    // * dynamically create a struct variable instead of an array?
     calc_wall_pixels();
     for(int i = 0; i != PIXELCOUNT; i++)
     {
         if(wall_pixels[i][0] != 0)
         {
-            // Using standalone ifs so multiple collisions work e.g. when the player is in a corner they can't phase through the corner
-            if(key == 'a' && jerry.x - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x++;
-            if(key == 'd' && jerry.x + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x--;
-            if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y++;
-            if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y--;
-
-            tom_ai( wall_pixels[i][0], wall_pixels[i][1]);
-
+            // Using jerry.speed to directly affect movement speed
+            if(key == 'a' && jerry.x - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x + jerry.speed;
+            if(key == 'd' && jerry.x + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x - jerry.speed;
+            if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y + jerry.speed;
+            if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y - jerry.speed;
+            tom_ai( wall_pixels[i][0], wall_pixels[i][1]); // Calling TOMS ai
         }
     }
 }
@@ -297,7 +319,7 @@ void read_file(FILE*stream)
     }
 }
 
-void jerry_setup() 
+void jerry_setup( void ) 
 {
     jerry.speed = 1;
     jerry.health = 100;
@@ -307,16 +329,17 @@ void jerry_setup()
 
 }
 
-void tom_setup()
+void tom_setup( void )
 {
     tom.speed = jerry.speed / 2;
     tom.health = 100;
 
     tom.x = tom.x * game.W;
     tom.y = (tom.y * game.H) + game.ob_y;
+    tom.wall = 0;
 }
 
-void tom_ob_check()
+void tom_ob_check( void )
 {
     if(tom.x < game.ob_x){tom.x++;}
     if(tom.y < game.ob_y){tom.y++;}
@@ -328,6 +351,8 @@ void tom_ob_check()
 void controller( void )
 {
     int key = get_char();
+    if(key == 'p') game.pause = (game.pause) ? false : true;
+
     if(game.wall) return;
 
     collision_wall( key );
@@ -338,12 +363,14 @@ void controller( void )
     else if (key == 's' && jerry.y + 1 < game.H) jerry.y++;
 }
 
-void game_logic_setup (void)
+void game_logic_setup ( void )
 {   
     // Game conditions
     game.g_over = false;
     game.score = 0;
     game.loop_delay = 10;
+
+    game.pause = false;
 
     game.ob_x = 0;
     game.ob_y = 3;
@@ -364,7 +391,8 @@ void game_logic_setup (void)
     game.fw_max = 0;
 
     game.lives = 5;
-    game.time = 0;
+    game.min = 0;
+    game.sec = 0;
 
     game.level = 0;
 
@@ -374,16 +402,24 @@ void game_logic_setup (void)
     game.wall = false; // Collision boolean
 }
 
-void setup (void) {
+void setup ( void ) 
+{
     game_logic_setup();
     jerry_setup();
     tom_setup();
     status_bar();
 }
 
+void timer( void )
+{
+    int milsec=0;
+    if( milsec == 60 ) game.sec=++;
+    if ( game.sec == 60 ) game.min++;
+    milsec++;
+}
 
 
-void loop(void) 
+void loop( void ) 
 {
     clear_screen();
     game.W = screen_width();
@@ -394,7 +430,7 @@ void loop(void)
     draw_wall();
     controller();
     tom_ob_check();
-
+    timer();
 
     draw_char(jerry.x, jerry.y, jerry.img);
     draw_char(tom.x, tom.y, tom.img);
