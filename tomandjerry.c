@@ -57,6 +57,8 @@ struct game_logic
     int milsec; // Timer milliseconds
     int level;
 
+    int drawn_door;
+
     int W;
     int H;
 
@@ -71,7 +73,7 @@ struct gObj
 {
     int x;
     int y;
-} c1, c2, c3, c4 ,c5, t1, t2 ,t3 ,t4, t5;
+} c1, c2, c3, c4 ,c5, t1, t2 ,t3 ,t4, t5, door;
 
 /*
     Contains struct for both jerry and toms x,y speed and global vars that need
@@ -81,6 +83,7 @@ struct character
 {
     double speed;
     double x,y;
+    int start_x,start_y;
     char img;
     int wall;
 } jerry, tom;
@@ -108,6 +111,16 @@ void scale_walls()
             walls_scaled[i][3] = SCALEY(walls[i][3]);
         }
     }
+}
+/*
+    Reset Jerry and Tom to their starting positions
+*/
+void reset()
+{
+    jerry.x = jerry.start_x;
+    jerry.y = jerry.start_y;
+    tom.x = tom.start_x;
+    tom.y = tom.start_y;
 }
 
 void status_bar()
@@ -224,6 +237,7 @@ void tom_ai( double wall_x, double wall_y )
 {
     int near_wall = tom_wall(wall_x, wall_y);
     if( game.pause ) return;
+    if(floor(tom.x) == floor(jerry.x) && floor(tom.y) == floor(jerry.y)) game.lives--, reset();
     if(!near_wall)
     {
         if(!tom.wall)
@@ -243,6 +257,7 @@ void tom_ai( double wall_x, double wall_y )
                 if ( dy < 0 ) tom.y = TPOSCALC(tom.y, tom.speed, 1),near_wall = 0;
                 if ( dy > 0 ) tom.y = TPOSCALC(tom.y, tom.speed, 0),near_wall = 0;
             }
+
         }
     }
     else
@@ -263,6 +278,29 @@ void tom_ai( double wall_x, double wall_y )
             tom.wall = 0;
     }
 }
+
+void door_mechanic(int wx, int wy)
+{
+    if(game.score == 5 && game.drawn_door == 0)
+    {
+        int x = rand() % game.W;
+        int y = rand() % game.H;
+        while ( VSPAWN(x, y, wx, wy))
+        {
+            x = rand() % game.W;
+            y = rand() % game.H;
+        }
+        door.x = x;
+        door.y = y;
+    }
+}
+
+void render_door()
+{
+    draw_char(door.x, door.y, 'X');
+    game.drawn_door = 1;
+}
+
 
 void mt_place( int wx, int wy )
 {
@@ -288,18 +326,18 @@ void mt_render( void )
     CRENDER(t5.x, t5.y, 'M');
 
 
-    if(jerry.x == t1.x && jerry.y == t1.y) game.score++, t1.x = 0, t1.y = 0, game.mt_active--;
-    if(jerry.x == t2.x && jerry.y == t2.y) game.score++, t2.x = 0, t2.y = 0, game.mt_active--;
-    if(jerry.x == t3.x && jerry.y == t3.y) game.score++, t3.x = 0, t3.y = 0, game.mt_active--;
-    if(jerry.x == t4.x && jerry.y == t4.y) game.score++, t4.x = 0, t4.y = 0, game.mt_active--;
-    if(jerry.x == t5.x && jerry.y == t5.y) game.score++, t5.x = 0, t5.y = 0, game.mt_active--;
+    if(jerry.x == t1.x && jerry.y == t1.y) t1.x = 0, t1.y = 0, game.mt_active--, game.lives--, reset();
+    if(jerry.x == t2.x && jerry.y == t2.y) t2.x = 0, t2.y = 0, game.mt_active--, game.lives--, reset();
+    if(jerry.x == t3.x && jerry.y == t3.y) t3.x = 0, t3.y = 0, game.mt_active--, game.lives--, reset();
+    if(jerry.x == t4.x && jerry.y == t4.y) t4.x = 0, t4.y = 0, game.mt_active--, game.lives--, reset();
+    if(jerry.x == t5.x && jerry.y == t5.y) t5.x = 0, t5.y = 0, game.mt_active--, game.lives--, reset();
 }
 
 void cheese_place( int wx, int wy )
 {
     if(game.sec % game.c_interval == 0 && game.cpsec != game.sec)
     {
-        if(game.c_active == 5) return;
+        if(game.c_active >= 5) return;
         game.cpsec = game.sec;
         int x,y;
         x = rand() % screen_width();
@@ -310,6 +348,8 @@ void cheese_place( int wx, int wy )
             x = rand() % screen_width();
             y = rand() % screen_height();
         }
+
+        if(y <= game.ob_y) y = y + game.ob_y;
         if(c1.x == 0 && c1.y == 0) c1.x = x, c1.y = y;
         else if(c2.x == 0 && c2.y == 0) c2.x = x, c2.y = y;
         else if(c3.x == 0 && c3.y == 0) c3.x = x, c3.y = y;
@@ -349,8 +389,9 @@ void collision_wall( char key )
             if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y + jerry.speed;
             if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y - jerry.speed;
             tom_ai( wall_pixels[i][0], wall_pixels[i][1]); // Calling TOMS ai
-            cheese_place( wall_pixels[i][0], wall_pixels[i][1]); // Cheese location
-            mt_place( wall_pixels[i][0], wall_pixels[i][1]);
+            cheese_place( wall_pixels[i][0], wall_pixels[i][1] ); // Cheese location
+            mt_place( wall_pixels[i][0], wall_pixels[i][1] ); // Mouse trap function call
+            door_mechanic( wall_pixels[i][0], wall_pixels[i][1] );
         }
     }
 }
@@ -412,6 +453,9 @@ void jerry_setup( void )
     jerry.x = jerry.x * game.W;
     jerry.y = (jerry.y * game.H) + game.ob_y;
 
+    jerry.start_x = jerry.x;
+    jerry.start_y = jerry.y;
+
 }
 
 void tom_setup( void )
@@ -420,6 +464,10 @@ void tom_setup( void )
 
     tom.x = tom.x * game.W;
     tom.y = (tom.y * game.H) + game.ob_y;
+
+    tom.start_x = tom.x;
+    tom.start_y = tom.y;
+
     tom.wall = 0;
 }
 
@@ -451,7 +499,7 @@ void game_logic_setup ( void )
 {   
     // Game conditions
     game.g_over = false;
-    game.score = 0;
+    game.score = 5;
     game.loop_delay = 10;
 
     game.pause = false;
@@ -459,6 +507,7 @@ void game_logic_setup ( void )
     game.ob_x = 0;
     game.ob_y = 3;
 
+    game.drawn_door = 0;
 
     // Cheese
     game.c_active = 0;
@@ -538,6 +587,7 @@ void loop( void )
     timer();
     cheese_render();
     mt_render();
+    render_door();
 
     draw_char(jerry.x, jerry.y, jerry.img);
     draw_char(tom.x, tom.y, tom.img);
