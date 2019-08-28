@@ -22,8 +22,13 @@
 #define TPOSCALC(c,s,t) (t == 0 ? (c + (s / (PIXELCOUNT)) ) : (c - (s / (PIXELCOUNT)) ) ) // C = current position, S = speed, T = Type (Type refers to either positive or negative of Jerrys coords)
 #define SCALEX(x) (x * game.W) // Scale wall point to screen resolution
 #define SCALEY(y) ((y * (game.H - game.ob_y)) + game.ob_y) // Scale wall point to resolution on Y (includes automatic scaling from the status bar)
-#define VSPAWN(x,y,wx,wy) (y == wy ? true : (x == wx ? true : false) )
+#define VSPAWN(x,y,wx,wy) (y == wy || x == wx ? true : false)
 #define CRENDER(x, y, i) (x != 0 && y != 0 ? draw_char(x, y, i) : 0)
+
+/*
+    Easy command:
+    gcc -g tomandjerry.c -o tomandjerry -Wall -Werror -L../ZDK -I../ZDK -lzdk -lm -lncurses;./tomandjerry.exe room00.txt 
+*/
 
 
 
@@ -62,9 +67,12 @@ struct game_logic
     int W;
     int H;
 
+    int charswitch;
+
     // Status bar out of bounds collision
     int ob_x;
     int ob_y;
+    int exit;
 
     bool wall;
 } game;
@@ -121,6 +129,20 @@ void reset()
     jerry.y = jerry.start_y;
     tom.x = tom.start_x;
     tom.y = tom.start_y;
+}
+
+int check_pixel(int x, int y)
+{
+    int t = 1;
+    for(int i = 0; i <= PIXELCOUNT; i++)
+    {
+        int wx = wall_pixels[i][0];
+        int wy = wall_pixels[i][1];
+        if(x == wx && y == wy) t = 1;
+        else if (y <= game.ob_y || x < game.ob_x || x > game.W || y > game.H) t = 1;
+        else t = 0;
+    }
+    return t;
 }
 
 void status_bar()
@@ -218,13 +240,23 @@ void calc_wall_pixels()
     returns: 1 (Wall detected)
     returns: 0 (No Wall detected)
 */
-int tom_wall ( double wall_x, double wall_y )
+int check_wall ( double wall_x, double wall_y )
 {
     int t = 0;
-    if(round(tom.x - 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x + 1), t = 1; // left 
-    if(round(tom.x + 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x - 1), t = 1; // right
-    if(round(tom.y - 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y + 1), t = 1; // above
-    if(round(tom.y + 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y - 1), t = 1; // below
+    if( game.charswitch )
+    {
+        if(round(jerry.x - 1) == wall_x && round(jerry.y) == wall_y)          jerry.x = round(jerry.x + 1), t = 1; // left 
+        if(round(jerry.x + 1) == wall_x && round(jerry.y) == wall_y)          jerry.x = round(jerry.x - 1), t = 1; // right
+        if(round(jerry.y - 1) == (wall_y) && round(jerry.x) == wall_x)        jerry.y = round(jerry.y + 1), t = 1; // above
+        if(round(jerry.y + 1) == (wall_y) && round(jerry.x) == wall_x)        jerry.y = round(jerry.y - 1), t = 1; // below
+    }
+    else
+    {
+        if(round(tom.x - 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x + 1), t = 1; // left 
+        if(round(tom.x + 1) == wall_x && round(tom.y) == wall_y)          tom.x = round(tom.x - 1), t = 1; // right
+        if(round(tom.y - 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y + 1), t = 1; // above
+        if(round(tom.y + 1) == (wall_y) && round(tom.x) == wall_x)        tom.y = round(tom.y - 1), t = 1; // below
+    }
     return t;
 }
 
@@ -235,7 +267,7 @@ int tom_wall ( double wall_x, double wall_y )
 */
 void tom_ai( double wall_x, double wall_y )
 {
-    int near_wall = tom_wall(wall_x, wall_y);
+    int near_wall = check_wall(wall_x, wall_y);
     if( game.pause ) return;
     if(floor(tom.x) == floor(jerry.x) && floor(tom.y) == floor(jerry.y)) game.lives--, reset();
     if(!near_wall)
@@ -279,30 +311,40 @@ void tom_ai( double wall_x, double wall_y )
     }
 }
 
-void door_mechanic(int wx, int wy)
+void jerry_ai( double wall_x, double wall_y )
+{
+    // int near_wall = check_wall(wall_x, wall_y);
+    if(floor(tom.x) == floor(jerry.x) && floor(tom.y) == floor(jerry.y)) game.score += 5, reset();
+    if( game.pause ) return;
+}
+
+void door_mechanic( void )
 {
     if(game.score == 5 && game.drawn_door == 0)
     {
         int x = rand() % game.W;
         int y = rand() % game.H;
-        while ( VSPAWN(x, y, wx, wy))
+        // Check to see if out of bounds
+        if (check_pixel(x, y))
         {
-            x = rand() % game.W;
-            y = rand() % game.H;
+            x = x > game.W ? x + 1 : x - 1;
+            y = y > game.H ? y - game.ob_y * 2 : y + game.ob_y * 2;
         }
         door.x = x;
-        door.y = y;
+        door.y = y - game.ob_y;
     }
 }
 
 void render_door()
 {
-    draw_char(door.x, door.y, 'X');
-    game.drawn_door = 1;
+    if(door.x != 0 && door.y != 0)
+    {
+        draw_char(door.x, door.y, 'X');
+        game.drawn_door = 1;
+    }
 }
 
-
-void mt_place( int wx, int wy )
+void mt_place( void )
 {
     if(game.sec % game.mt_interval == 0 && game.mtpsec != game.sec)
     {
@@ -325,28 +367,38 @@ void mt_render( void )
     CRENDER(t4.x, t4.y, 'M');
     CRENDER(t5.x, t5.y, 'M');
 
-
-    if(jerry.x == t1.x && jerry.y == t1.y) t1.x = 0, t1.y = 0, game.mt_active--, game.lives--, reset();
-    if(jerry.x == t2.x && jerry.y == t2.y) t2.x = 0, t2.y = 0, game.mt_active--, game.lives--, reset();
-    if(jerry.x == t3.x && jerry.y == t3.y) t3.x = 0, t3.y = 0, game.mt_active--, game.lives--, reset();
-    if(jerry.x == t4.x && jerry.y == t4.y) t4.x = 0, t4.y = 0, game.mt_active--, game.lives--, reset();
-    if(jerry.x == t5.x && jerry.y == t5.y) t5.x = 0, t5.y = 0, game.mt_active--, game.lives--, reset();
+    // Character is controlled by jerry
+    if( !game.charswitch )
+    {
+        if(jerry.x == t1.x && jerry.y == t1.y) t1.x = 0, t1.y = 0, game.mt_active--, game.lives--, reset();
+        if(jerry.x == t2.x && jerry.y == t2.y) t2.x = 0, t2.y = 0, game.mt_active--, game.lives--, reset();
+        if(jerry.x == t3.x && jerry.y == t3.y) t3.x = 0, t3.y = 0, game.mt_active--, game.lives--, reset();
+        if(jerry.x == t4.x && jerry.y == t4.y) t4.x = 0, t4.y = 0, game.mt_active--, game.lives--, reset();
+        if(jerry.x == t5.x && jerry.y == t5.y) t5.x = 0, t5.y = 0, game.mt_active--, game.lives--, reset();
+    }
+    else // Tom
+    {
+        if(jerry.x == t1.x && jerry.y == t1.y) t1.x = 0, t1.y = 0, game.mt_active--, game.score++, reset();
+        if(jerry.x == t2.x && jerry.y == t2.y) t2.x = 0, t2.y = 0, game.mt_active--, game.score++, reset();
+        if(jerry.x == t3.x && jerry.y == t3.y) t3.x = 0, t3.y = 0, game.mt_active--, game.score++, reset();
+        if(jerry.x == t4.x && jerry.y == t4.y) t4.x = 0, t4.y = 0, game.mt_active--, game.score++, reset();
+        if(jerry.x == t5.x && jerry.y == t5.y) t5.x = 0, t5.y = 0, game.mt_active--, game.score++, reset();
+    }
 }
 
-void cheese_place( int wx, int wy )
+void cheese_place( void )
 {
     if(game.sec % game.c_interval == 0 && game.cpsec != game.sec)
     {
         if(game.c_active >= 5) return;
         game.cpsec = game.sec;
         int x,y;
-        x = rand() % screen_width();
-        y = rand() % screen_height();
-
-        while (VSPAWN(x, y, wx, wy))
+        x = rand() % game.W;
+        y = rand() % game.H;
+        if (check_pixel(x, y))
         {
-            x = rand() % screen_width();
-            y = rand() % screen_height();
+            x = x > game.W ? x + 1 : x - 1;
+            y = y > game.H ? y - game.ob_y * 2 : y + game.ob_y * 2;
         }
 
         if(y <= game.ob_y) y = y + game.ob_y;
@@ -383,15 +435,23 @@ void collision_wall( char key )
     {
         if(wall_pixels[i][0] != 0)
         {
-            // Using jerry.speed to directly affect movement speed
-            if(key == 'a' && jerry.x - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x + jerry.speed;
-            if(key == 'd' && jerry.x + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x - jerry.speed;
-            if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y + jerry.speed;
-            if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y - jerry.speed;
-            tom_ai( wall_pixels[i][0], wall_pixels[i][1]); // Calling TOMS ai
-            cheese_place( wall_pixels[i][0], wall_pixels[i][1] ); // Cheese location
-            mt_place( wall_pixels[i][0], wall_pixels[i][1] ); // Mouse trap function call
-            door_mechanic( wall_pixels[i][0], wall_pixels[i][1] );
+            if(!game.charswitch)
+            {
+                // Using jerry.speed to directly affect movement speed
+                if(key == 'a' && jerry.x - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x + jerry.speed;
+                if(key == 'd' && jerry.x + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x - jerry.speed;
+                if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y + jerry.speed;
+                if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y - jerry.speed;
+                tom_ai(wall_pixels[i][0], wall_pixels[i][1]); // Calling TOMS ai
+            }   
+            else
+            {
+                if(key == 'a' && tom.x - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == tom.y) tom.x = tom.x + tom.speed;
+                if(key == 'd' && tom.x + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == tom.y) tom.x = tom.x - tom.speed;
+                if(key == 'w' && tom.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == tom.x) tom.y = tom.y + tom.speed;
+                if(key == 's' && tom.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == tom.x) tom.y = tom.y - tom.speed;
+                jerry_ai(wall_pixels[i][0], wall_pixels[i][1]); // Calling TOMS ai
+            }
         }
     }
 }
@@ -483,23 +543,35 @@ void tom_ob_check( void )
 void controller( void )
 {
     int key = get_char();
+    if(key == 'r') game.lives = 0;
     if(key == 'p') game.pause = (game.pause) ? false : true;
+    if(key == 'z') game.charswitch = (game.charswitch) ? 0 : 1;
 
     if(game.wall) return;
 
     collision_wall( key );
 
-    if(key == 'a' && jerry.x - 1 >= game.ob_x) jerry.x--;
-    else if (key == 'd' && jerry.x + 1 < game.W) jerry.x++;
-    else if (key == 'w' && jerry.y - 1 >= game.ob_y) jerry.y--;
-    else if (key == 's' && jerry.y + 1 < game.H) jerry.y++;
+    if(!game.charswitch)
+    {
+        if(key == 'a' && jerry.x - 1 >= game.ob_x) jerry.x--;
+        else if (key == 'd' && jerry.x + 1 < game.W) jerry.x++;
+        else if (key == 'w' && jerry.y - 1 >= game.ob_y) jerry.y--;
+        else if (key == 's' && jerry.y + 1 < game.H) jerry.y++;
+    }
+    else
+    {
+        if(key == 'a' && tom.x - 1 >= game.ob_x) tom.x--;
+        else if (key == 'd' && tom.x + 1 < game.W) tom.x++;
+        else if (key == 'w' && tom.y - 1 >= game.ob_y) tom.y--;
+        else if (key == 's' && tom.y + 1 < game.H) tom.y++;
+    }
 }
 
 void game_logic_setup ( void )
 {   
     // Game conditions
     game.g_over = false;
-    game.score = 5;
+    game.score = 0;
     game.loop_delay = 10;
 
     game.pause = false;
@@ -528,7 +600,11 @@ void game_logic_setup ( void )
     game.sec = 0;
     game.milsec = 0;
 
-    game.level = 0;
+    game.level = 1;
+
+    game.charswitch = 0;
+
+    game.exit = 0;
 
     // Screen
     game.W = screen_width();
@@ -580,11 +656,15 @@ void loop( void )
     game.H = screen_height();
 
 
+    if(game.lives <= 0) game.g_over = true;
     status_bar();
     draw_wall();
     controller();
     tom_ob_check();
     timer();
+    cheese_place(); // Cheese location
+    mt_place(); // Mouse trap function call
+    door_mechanic();
     cheese_render();
     mt_render();
     render_door();
@@ -593,6 +673,37 @@ void loop( void )
     draw_char(tom.x, tom.y, tom.img);
 
     show_screen();
+}
+
+
+void game_over_screen()
+{
+    clear_screen();
+    draw_formatted(game.W / 2 - 5, game.H / 2, "Game Over!");
+    draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or R to try again!");
+    show_screen();
+}
+
+void game_loop()
+{
+    while ( !game.g_over ) {
+        loop();
+        timer_pause(game.loop_delay);
+    }
+}
+
+void reset_advance()
+{
+    game.g_over = 0;
+    char t[24];
+    sprintf(t, "room%02d.txt", game.level );
+    FILE * stream = fopen(t, "r");
+    if (stream != NULL)
+    {
+        read_file(stream);
+        fclose(stream);
+    }
+    setup();
 }
 
 int main(int argc, char *argv[]) 
@@ -612,10 +723,38 @@ int main(int argc, char *argv[])
 
     draw_wall();
     show_screen();
+    game_loop();
 
-    while ( !game.g_over ) {
-        loop();
-        timer_pause(10);
+    while( 1 )
+    {
+        if(game.g_over && !game.exit)
+        {
+            int key = get_char();
+            if(key == 'q') exit(1);
+            else if(key == 'r')
+            {
+                game.g_over = 0;
+                char t[24];
+                sprintf(t, "room%02d.txt", game.level );
+                FILE * stream = fopen(t, "r");
+                if (stream != NULL)
+                {
+                    read_file(stream);
+                    fclose(stream);
+                }
+                setup();
+            }
+            else
+            {
+                game_over_screen();
+            }
+            timer_pause(game.loop_delay);
+        }
+        else
+        {
+            game_loop();
+        }
+        
     }
     return 0;
 }
