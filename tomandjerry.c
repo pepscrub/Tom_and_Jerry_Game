@@ -63,6 +63,7 @@ struct game_logic
     int level;
 
     int drawn_door;
+    int advance;
 
     int W;
     int H;
@@ -99,10 +100,11 @@ struct character
 
 
 
-// 
+// Globals
 double walls[50][4]; // Walls initial position
 double walls_scaled[50][4]; // Walls scaled up to screen resolution
 double wall_pixels[PIXELCOUNT][2]; // Array holding x,y coordinate of each wall pixel. 0 = x, 1 = y
+int level = 1;
 
 /*
     Generic function that scales the walls up to the screen resoultion
@@ -157,7 +159,7 @@ void status_bar()
     draw_formatted(0,1,"Cheese: %d", game.c_active);
     draw_formatted(margin,1,"Traps: %d", game.mt_active);
     draw_formatted(margin*2,1,"Fireworks: %d", game.fw_active);
-    draw_formatted(margin*3,1,"Level: %d", game.level);
+    draw_formatted(margin*3,1,"Level: %d", level);
     draw_line(0, 2, game.W, 2, '-');
 }
 
@@ -342,6 +344,17 @@ void render_door()
         draw_char(door.x, door.y, 'X');
         game.drawn_door = 1;
     }
+    if(round(jerry.x) == door.x && round(jerry.y) == door.y && !game.charswitch)
+    {
+        draw_int(10,10,1);
+        level++;
+        game.g_over = true;
+    }
+    else if(round(tom.x) == door.x && round(tom.y) == door.y && game.charswitch)
+    {
+        level++;
+        game.g_over = true;
+    }
 }
 
 void mt_place( void )
@@ -435,6 +448,10 @@ void collision_wall( char key )
     {
         if(wall_pixels[i][0] != 0)
         {
+            draw_int(9, 6, jerry.x);
+            draw_int(9, 7, jerry.y);
+            draw_int(1, i+6, wall_pixels[i][0]);
+            draw_int(5, i+6, wall_pixels[i][0]);
             if(!game.charswitch)
             {
                 // Using jerry.speed to directly affect movement speed
@@ -571,7 +588,7 @@ void game_logic_setup ( void )
 {   
     // Game conditions
     game.g_over = false;
-    game.score = 0;
+    game.score = 5;
     game.loop_delay = 10;
 
     game.pause = false;
@@ -599,8 +616,7 @@ void game_logic_setup ( void )
     game.min = 0;
     game.sec = 0;
     game.milsec = 0;
-
-    game.level = 1;
+    game.advance = 0;
 
     game.charswitch = 0;
 
@@ -680,9 +696,18 @@ void game_over_screen()
 {
     clear_screen();
     draw_formatted(game.W / 2 - 5, game.H / 2, "Game Over!");
-    draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or R to try again!");
+    draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or C to try again!");
     show_screen();
 }
+
+void game_advance_screen()
+{
+    clear_screen();
+    draw_formatted(game.W / 2 - 4, game.H / 2, "Success!");
+    draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or C to advance!");
+    show_screen();
+}
+
 
 void game_loop()
 {
@@ -696,7 +721,7 @@ void reset_advance()
 {
     game.g_over = 0;
     char t[24];
-    sprintf(t, "room%02d.txt", game.level );
+    sprintf(t, "room%02d.txt", level );
     FILE * stream = fopen(t, "r");
     if (stream != NULL)
     {
@@ -727,15 +752,16 @@ int main(int argc, char *argv[])
 
     while( 1 )
     {
-        if(game.g_over && !game.exit)
+        if(game.g_over)
         {
             int key = get_char();
             if(key == 'q') exit(1);
-            else if(key == 'r')
+            else if(key == 'c')
             {
                 game.g_over = 0;
                 char t[24];
-                sprintf(t, "room%02d.txt", game.level );
+                sprintf(t, "room%02d.txt", level - 1);
+                printf(t);
                 FILE * stream = fopen(t, "r");
                 if (stream != NULL)
                 {
@@ -750,10 +776,11 @@ int main(int argc, char *argv[])
             }
             timer_pause(game.loop_delay);
         }
-        else
+        else if(!game.g_over)
         {
             game_loop();
         }
+        
         
     }
     return 0;
