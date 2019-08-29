@@ -60,7 +60,9 @@ struct game_logic
     int cpsec; // Previous second for cheese
     int mtpsec;
     int milsec; // Timer milliseconds
-    int level;
+    int currlvl; // Current level
+    int maxlvls; // Max levels
+    char level[10][12]; // levels
 
     int drawn_door;
     int advance;
@@ -104,7 +106,6 @@ struct character
 double walls[50][4]; // Walls initial position
 double walls_scaled[50][4]; // Walls scaled up to screen resolution
 double wall_pixels[PIXELCOUNT][2]; // Array holding x,y coordinate of each wall pixel. 0 = x, 1 = y
-int level = 1;
 
 /*
     Generic function that scales the walls up to the screen resoultion
@@ -131,6 +132,9 @@ void reset()
     jerry.y = jerry.start_y;
     tom.x = tom.start_x;
     tom.y = tom.start_y;
+
+    game.advance = 0;
+
 }
 
 int check_pixel(int x, int y)
@@ -140,7 +144,7 @@ int check_pixel(int x, int y)
     {
         int wx = wall_pixels[i][0];
         int wy = wall_pixels[i][1];
-        if(x == wx && y == wy) t = 1;
+        if(x == wx && y == wy) t = 0;
         else if (y <= game.ob_y || x < game.ob_x || x > game.W || y > game.H) t = 1;
         else t = 0;
     }
@@ -159,7 +163,7 @@ void status_bar()
     draw_formatted(0,1,"Cheese: %d", game.c_active);
     draw_formatted(margin,1,"Traps: %d", game.mt_active);
     draw_formatted(margin*2,1,"Fireworks: %d", game.fw_active);
-    draw_formatted(margin*3,1,"Level: %d", level);
+    draw_formatted(margin*3,1,"Level: %d", game.currlvl);
     draw_line(0, 2, game.W, 2, '-');
 }
 
@@ -237,6 +241,16 @@ void calc_wall_pixels()
     }
 }
 
+
+void clear_wall_pixels()
+{
+    for(int i = 0; i < PIXELCOUNT; i++)
+    {
+        wall_pixels[i][0] = 0;
+        wall_pixels[i][1] = 0;
+    }
+}
+
 /*
     Checks to see if a wall is 1 pixel away from tom in all directions
     returns: 1 (Wall detected)
@@ -274,16 +288,16 @@ void tom_ai( double wall_x, double wall_y )
     if(floor(tom.x) == floor(jerry.x) && floor(tom.y) == floor(jerry.y)) game.lives--, reset();
     if(!near_wall)
     {
-        if(!tom.wall)
+        if(!jerry.wall)
         {
             int dx,dy;
             dx = jerry.x - tom.x;
             dy = jerry.y - tom.y;
 
-            if( round(jerry.x) == round(tom.x) && round(tom.y) <= round(jerry.y) )           tom.y = TPOSCALC(tom.y, tom.speed, 0),near_wall = 0;
-            else if( round(jerry.x) == round(tom.x) && round(tom.y) > round(jerry.y)  )      tom.y = TPOSCALC(tom.y, tom.speed, 1),near_wall = 0;
-            else if( round(jerry.y) == round(tom.y) && round(tom.x) <= round(jerry.x) )      tom.x = TPOSCALC(tom.x, tom.speed, 0),near_wall = 0;
-            else if( round(jerry.y) == round(tom.y) && round(tom.x) > round(jerry.x)  )      tom.x = TPOSCALC(tom.x, tom.speed, 1),near_wall = 0;
+            if( round(jerry.x) == round(tom.x) && round(tom.y) <= round(jerry.y) )           tom.y = TPOSCALC(tom.y, tom.speed, 1),near_wall = 0;
+            else if( round(jerry.x) == round(tom.x) && round(tom.y) > round(jerry.y)  )      tom.y = TPOSCALC(tom.y, tom.speed, 0),near_wall = 0;
+            else if( round(jerry.y) == round(tom.y) && round(tom.x) <= round(jerry.x) )      tom.x = TPOSCALC(tom.x, tom.speed, 1),near_wall = 0;
+            else if( round(jerry.y) == round(tom.y) && round(tom.x) > round(jerry.x)  )      tom.x = TPOSCALC(tom.x, tom.speed, 0),near_wall = 0;
             else // Line algroithim appeared to exibit the same behaviours as the code below
             {
                 if ( dx < 0 ) tom.x = TPOSCALC(tom.x, tom.speed, 1),near_wall = 0;
@@ -327,7 +341,7 @@ void door_mechanic( void )
         int x = rand() % game.W;
         int y = rand() % game.H;
         // Check to see if out of bounds
-        if (check_pixel(x, y))
+        while (check_pixel(x, y))
         {
             x = x > game.W ? x + 1 : x - 1;
             y = y > game.H ? y - game.ob_y * 2 : y + game.ob_y * 2;
@@ -346,13 +360,14 @@ void render_door()
     }
     if(round(jerry.x) == door.x && round(jerry.y) == door.y && !game.charswitch)
     {
-        draw_int(10,10,1);
-        level++;
+        game.currlvl++;
+        game.advance = 1;
         game.g_over = true;
     }
     else if(round(tom.x) == door.x && round(tom.y) == door.y && game.charswitch)
     {
-        level++;
+        game.currlvl++;
+        game.advance = 1;
         game.g_over = true;
     }
 }
@@ -363,11 +378,11 @@ void mt_place( void )
     {
         if(game.mt_active == 5) return;
         game.mtpsec = game.sec;
-        if(t1.x == 0 && t1.y == 0) t1.x = tom.x, t1.y = tom.y;
-        else if(t1.x == 0 && t1.y == 0) t1.x = tom.x, t1.y = tom.y;
-        else if(t2.x == 0 && t2.y == 0) t2.x = tom.x, t2.y = tom.y;
-        else if(t3.x == 0 && t3.y == 0) t3.x = tom.x, t3.y = tom.y;
-        else if(t4.x == 0 && t4.y == 0) t4.x = tom.x, t4.y = tom.y;
+        if(t1.x == 0 && t1.y == 0 && !check_pixel(t1.x, t1.y)) t1.x = tom.x, t1.y = tom.y;
+        else if(t1.x == 0 && t1.y == 0 && !check_pixel(t1.x, t1.y)) t1.x = tom.x, t1.y = tom.y;
+        else if(t2.x == 0 && t2.y == 0 && !check_pixel(t1.x, t1.y)) t2.x = tom.x, t2.y = tom.y;
+        else if(t3.x == 0 && t3.y == 0 && !check_pixel(t1.x, t1.y)) t3.x = tom.x, t3.y = tom.y;
+        else if(t4.x == 0 && t4.y == 0 && !check_pixel(t1.x, t1.y)) t4.x = tom.x, t4.y = tom.y;
         game.mt_active++;
     }
 }
@@ -415,11 +430,11 @@ void cheese_place( void )
         }
 
         if(y <= game.ob_y) y = y + game.ob_y;
-        if(c1.x == 0 && c1.y == 0) c1.x = x, c1.y = y;
-        else if(c2.x == 0 && c2.y == 0) c2.x = x, c2.y = y;
-        else if(c3.x == 0 && c3.y == 0) c3.x = x, c3.y = y;
-        else if(c4.x == 0 && c4.y == 0) c4.x = x, c4.y = y;
-        else if(c5.x == 0 && c5.y == 0) c5.x = x, c5.y = y;
+        if(c1.x == 0 && c1.y == 0 && check_pixel(c1.x, c1.y)) c1.x = x, c1.y = y;
+        else if(c2.x == 0 && c2.y == 0 && check_pixel(c2.x, c2.y)) c2.x = x, c2.y = y;
+        else if(c3.x == 0 && c3.y == 0 && check_pixel(c3.x, c3.y)) c3.x = x, c3.y = y;
+        else if(c4.x == 0 && c4.y == 0 && check_pixel(c4.x, c4.y)) c4.x = x, c4.y = y;
+        else if(c5.x == 0 && c5.y == 0 && check_pixel(c5.x, c5.y)) c5.x = x, c5.y = y;
         game.c_active++;
     }
 }
@@ -448,17 +463,13 @@ void collision_wall( char key )
     {
         if(wall_pixels[i][0] != 0)
         {
-            draw_int(9, 6, jerry.x);
-            draw_int(9, 7, jerry.y);
-            draw_int(1, i+6, wall_pixels[i][0]);
-            draw_int(5, i+6, wall_pixels[i][0]);
             if(!game.charswitch)
             {
                 // Using jerry.speed to directly affect movement speed
-                if(key == 'a' && jerry.x - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x + jerry.speed;
-                if(key == 'd' && jerry.x + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x - jerry.speed;
-                if(key == 'w' && jerry.y - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y + jerry.speed;
-                if(key == 's' && jerry.y + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y - jerry.speed;
+                if(key == 'a' && round(jerry.x) - 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x + jerry.speed;
+                if(key == 'd' && round(jerry.x) + 1 == round(wall_pixels[i][0]) && wall_pixels[i][1] == jerry.y) jerry.x = jerry.x - jerry.speed;
+                if(key == 'w' && round(jerry.y) - 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y + jerry.speed;
+                if(key == 's' && round(jerry.y) + 1 == round(wall_pixels[i][1]) && wall_pixels[i][0] == jerry.x) jerry.y = jerry.y - jerry.speed;
                 tom_ai(wall_pixels[i][0], wall_pixels[i][1]); // Calling TOMS ai
             }   
             else
@@ -563,10 +574,14 @@ void controller( void )
     if(key == 'r') game.lives = 0;
     if(key == 'p') game.pause = (game.pause) ? false : true;
     if(key == 'z') game.charswitch = (game.charswitch) ? 0 : 1;
+    if(key == 'l') game.advance = 1, game.g_over = true, game.currlvl++;
 
     if(game.wall) return;
 
     collision_wall( key );
+
+    draw_int(10, 10, jerry.x);
+    draw_int(10, 11, jerry.y);
 
     if(!game.charswitch)
     {
@@ -597,6 +612,8 @@ void game_logic_setup ( void )
     game.ob_y = 3;
 
     game.drawn_door = 0;
+
+    game.currlvl = 1;
 
     // Cheese
     game.c_active = 0;
@@ -639,12 +656,49 @@ void game_logic_setup ( void )
     t4.x = 0, t4.y = 0;
     t5.x = 0, t5.y = 0;
 }
+
+void game_reset( void )
+{
+   // Game conditions
+    game.g_over = false;
+    game.score = 5;
+
+    game.drawn_door = 0;
+
+    // Cheese
+    game.c_active = 0;
+    game.c_advance = 5;
+    game.c_interval = 2;
+
+    // Mouse traps
+    game.mt_active = 0;
+    game.mt_interval = 3;
+    game.mt_max = 5;
+
+    game.fw_active = 0;
+    game.fw_interval = 0;
+    game.fw_max = 0;
+
+    game.lives = 5;
+
+    c1.x = 0, c1.y = 0;
+    c2.x = 0, c2.y = 0;
+    c3.x = 0, c3.y = 0;
+    c4.x = 0, c4.y = 0;
+    c5.x = 0, c5.y = 0;
+
+    t1.x = 0, t1.y = 0;
+    t2.x = 0, t2.y = 0;
+    t3.x = 0, c3.y = 0;
+    t4.x = 0, t4.y = 0;
+    t5.x = 0, t5.y = 0; 
+}
+
 /*
     Initial game setup
 */
 void setup ( void ) 
 {
-    game_logic_setup();
     jerry_setup();
     tom_setup();
     status_bar();
@@ -695,16 +749,8 @@ void loop( void )
 void game_over_screen()
 {
     clear_screen();
-    draw_formatted(game.W / 2 - 5, game.H / 2, "Game Over!");
-    draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or C to try again!");
-    show_screen();
-}
-
-void game_advance_screen()
-{
-    clear_screen();
-    draw_formatted(game.W / 2 - 4, game.H / 2, "Success!");
-    draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or C to advance!");
+    !game.advance ? draw_formatted(game.W / 2 - 5, game.H / 2, "Game Over!") : draw_formatted(game.W / 2 - 8, game.H / 2, "Congratulations!");
+    !game.advance && game.currlvl < game.maxlvls? draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or C to try again!") : (game.currlvl == game.maxlvls ? draw_formatted(game.W / 2 - 20, game.H / 2 + 1, "You completed the game! Press Q to quit.") : draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or C to continue!"));
     show_screen();
 }
 
@@ -717,33 +763,30 @@ void game_loop()
     }
 }
 
-void reset_advance()
+void load_level( int level )
 {
-    game.g_over = 0;
-    char t[24];
-    sprintf(t, "room%02d.txt", level );
-    FILE * stream = fopen(t, "r");
-    if (stream != NULL)
+    FILE * stream = fopen(game.level[level], "r");
+    if(stream != NULL)
     {
         read_file(stream);
         fclose(stream);
     }
-    setup();
 }
 
 int main(int argc, char *argv[]) 
 {
     for (int i = 1; i < argc; i++) 
     {
-        FILE * stream = fopen(argv[i], "r");
-        if (stream != NULL)
-        {
-            read_file(stream);
-            fclose(stream);
-        }
+        sprintf(game.level[i], "%s", argv[i]);
+        game.maxlvls = i;
     }
+    // Reading first level
+    game.currlvl = 1;
+    load_level(1);
+
     srand( time(NULL) );
     setup_screen();
+    game_logic_setup();
     setup();
 
     draw_wall();
@@ -756,19 +799,18 @@ int main(int argc, char *argv[])
         {
             int key = get_char();
             if(key == 'q') exit(1);
-            else if(key == 'c')
+            else if(key == 'c' && game.currlvl != game.maxlvls)
             {
-                game.g_over = 0;
-                char t[24];
-                sprintf(t, "room%02d.txt", level - 1);
-                printf(t);
-                FILE * stream = fopen(t, "r");
-                if (stream != NULL)
-                {
-                    read_file(stream);
-                    fclose(stream);
-                }
+                clear_screen();
+                load_level(game.currlvl);
                 setup();
+                draw_wall();
+                show_screen();
+                game_loop();
+                game.g_over = 0;
+                game.lives = 5;
+                clear_wall_pixels(); // Clearing wall pixels array
+                reset();
             }
             else
             {
