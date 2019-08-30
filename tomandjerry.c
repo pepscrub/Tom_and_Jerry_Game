@@ -107,7 +107,7 @@ struct character
 double walls[50][4]; // Walls initial position
 double walls_scaled[50][4]; // Walls scaled up to screen resolution
 double wall_pixels[PIXELCOUNT][2]; // Array holding x,y coordinate of each wall pixel. 0 = x, 1 = y
-int dx,dy;
+double dx,dy;
 
 /*
     Generic function that scales the walls up to the screen resoultion
@@ -334,27 +334,6 @@ void jerry_ai( double wall_x, double wall_y )
     // int near_wall = check_wall(wall_x, wall_y);
     if(floor(tom.x) == floor(jerry.x) && floor(tom.y) == floor(jerry.y)) game.score += 5, reset();
     if( game.pause ) return;
-
-    // int x = round(jerry.x);
-    // int y = round(jerry.y);
-    // int tx = round(tom.x);
-    // int ty = round(tom.y);
-
-
-    // double s = jerry.speed;
-    // int dx = x - tx;
-    // int dy = y - ty;
-
-    // draw_int(10, 10, x);
-    // draw_int(10, 11, y);
-    // draw_int(10, 13, ccx);
-    // draw_int(10, 14, ccy);
-
-    // if(dx < 5 && dx > 0 && x <= game.W)                 jerry.x = TPOSCALC(jerry.x, s, 0);
-    // else if (dx > -5 && dx < 0 && x > 0 && x < game.W)  jerry.x = TPOSCALC(jerry.x, s, 1);
-    // else if (dy < 5 && dy > 0 && y <= game.H)           jerry.y = TPOSCALC(jerry.y, s, 0);
-    // else if (dy > -5 && dy < 0 && y > game.ob_y)        jerry.y = TPOSCALC(jerry.y, s, 1);
-
 
 
     // if(near_wall) return;
@@ -597,37 +576,41 @@ void tom_ob_check( void )
 
 void firework()
 {
-    fw.x = round(jerry.x);
+    fw.x = round(jerry.x) == 0 ? round(jerry.x) + 1 : round(jerry.x);
     fw.y = round(jerry.y);
 }
 
 void firework_loop()
 {
-    int x,y;
+    if(game.pause) return;
+    double x,y;
     // bomb
-    x = round(tom.x);
-    y = round(tom.y);
+    x = tom.x;
+    y = tom.y;
 
     double t1,t2,d;
 
-    t1 = fw.x - x;
-    t2 = fw.y - y;
+    t1 = x - fw.x;
+    t2 = y - fw.y;
 
     d = sqrt(t1*t1 + t2*t2);
 
-    draw_int(10, 7, t1);
-    draw_int(10, 8, t2);
-    draw_double(10, 9, d);
-    draw_double(10, 11, t1 * 1.5 / d);
+    dx = t1 * .15 / d;
+    dy = t2 * .15 / d;
 
-    dx = t1 * 1.5 / d;
-    dy = t2 * 1.5 / d;
+    fw.x = dx + fw.x;
+    fw.y = dy + fw.y;
+    // Check pixel helper function did not check the current pixel fast enoughah 
+    for(int i = 0; i < PIXELCOUNT; i++)
+    {
+        int wx,wy;
+        wx = wall_pixels[i][0];
+        wy = wall_pixels[i][1];
 
-    draw_double(10, 13, dx);
-    draw_double(10, 14, dy);
+        if(round(fw.x) == round(wx) && round(fw.y) == round(wy)) fw.x = 0, fw.y = 0, game.fw_active = 0;
 
-    fw.x = round(dx + fw.x);
-    fw.y = round(dy + fw.y);
+    }
+    if(round(fw.x) == round(tom.x) && round(fw.y) == round(tom.y)) tom.x = tom.start_x, tom.y = tom.start_y, game.score++, fw.x = 0, fw.y = 0,game.fw_active = 0;
 }
 
 void controller( void )
@@ -648,7 +631,7 @@ void controller( void )
         else if (key == 'd' && jerry.x + 1 < game.W) jerry.x++;
         else if (key == 'w' && jerry.y - 1 >= game.ob_y) jerry.y--;
         else if (key == 's' && jerry.y + 1 < game.H) jerry.y++;
-        else if (key == 'f') firework();
+        else if (key == 'f' && !game.fw_active && game.currlvl > 1 && !game.pause) firework(), game.fw_active = 1;
 
     }
     else
@@ -802,7 +785,7 @@ void loop( void )
     game.W = screen_width();
     game.H = screen_height();
 
-    firework_loop();
+    if(fw.x != 0 && fw.y != 0) firework_loop();
 
     if(game.lives <= 0) game.g_over = true;
     draw_int(10, 15, game.firework);
@@ -817,7 +800,8 @@ void loop( void )
     cheese_render();
     mt_render();
     render_door();
-    draw_char(fw.x, fw.y, '!');
+    
+    if(fw.x != 0 && fw.y != 0) draw_char(fw.x, fw.y, '!');
 
     draw_char(jerry.x, jerry.y, jerry.img);
     draw_char(tom.x, tom.y, tom.img);
@@ -832,9 +816,6 @@ void game_over_screen()
     if(game.advance) game.firework = 1;
     !game.advance ? draw_formatted(game.W / 2 - 5, game.H / 2, "Game Over!") : draw_formatted(game.W / 2 - 8, game.H / 2, "Congratulations!");
     !game.advance && game.currlvl - 1 < game.maxlvls? draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or C to try again!") : (game.currlvl - 1 == game.maxlvls ? draw_formatted(game.W / 2 - 20, game.H / 2 + 1, "You completed the game! Press Q to quit.") : draw_formatted(game.W / 2 -18, game.H / 2 + 1, "Press Q to quit, or C to continue!"));
-    draw_int(10, 12, game.advance);
-    draw_int(10, 13, game.currlvl - 1);
-    draw_int(10, 14, game.maxlvls);
     show_screen();
 }
 
