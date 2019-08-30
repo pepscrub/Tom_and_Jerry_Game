@@ -609,13 +609,42 @@ void firework()
 
     t1 = x - fw.x;
     t2 = y - fw.y;
+    if(fw.x > x)
+    {
+        t1 = fw.x - x;
+        t2 = fw.y - y;
+    }
 
     d = sqrt(t1*t1 + t2*t2);
 
     dx = t1 * .15 / d;
     dy = t2 * .15 / d;
+
+    fw.x = round(dx + fw.x);
+    fw.y = round(dy + fw.y);
 }
 
+void firework_loop()
+{
+    if(fw.x == jerry.x) return;
+    int x,y;
+    // bomb
+    x = round(tom.x);
+    y = round(tom.y);
+
+    double t1,t2,d;
+
+    t1 = fw.x - x;
+    t2 = fw.y - y;
+
+    d = sqrt(t1*t1 + t2*t2);
+
+    dx = t1 * .15 / d;
+    dy = t2 * .15 / d;
+
+    fw.x = round(dx + fw.x);
+    fw.y = round(dy + fw.y);
+}
 
 void controller( void )
 {
@@ -776,6 +805,7 @@ void loop( void )
     game.W = screen_width();
     game.H = screen_height();
 
+    firework_loop();
 
     if(game.lives <= 0) game.g_over = true;
     draw_int(10, 15, game.firework);
@@ -790,12 +820,6 @@ void loop( void )
     cheese_render();
     mt_render();
     render_door();
-
-    draw_int(10, 20, dx);
-    draw_int(10, 21, dy);
-
-    fw.x = round(dx + fw.x);
-    fw.y = round(dy + fw.y);
     draw_char(fw.x, fw.y, '!');
 
     draw_char(jerry.x, jerry.y, jerry.img);
