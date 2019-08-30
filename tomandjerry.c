@@ -404,11 +404,11 @@ void mt_place( void )
     {
         if(game.mt_active == 5) return;
         game.mtpsec = game.sec;
-        if(t1.x == 0 && t1.y == 0 && !check_pixel(t1.x, t1.y)) t1.x = tom.x, t1.y = tom.y;
-        else if(t1.x == 0 && t1.y == 0 && !check_pixel(t1.x, t1.y)) t1.x = tom.x, t1.y = tom.y;
-        else if(t2.x == 0 && t2.y == 0 && !check_pixel(t1.x, t1.y)) t2.x = tom.x, t2.y = tom.y;
-        else if(t3.x == 0 && t3.y == 0 && !check_pixel(t1.x, t1.y)) t3.x = tom.x, t3.y = tom.y;
-        else if(t4.x == 0 && t4.y == 0 && !check_pixel(t1.x, t1.y)) t4.x = tom.x, t4.y = tom.y;
+        if(t1.x == 0 && t1.y == 0) t1.x = tom.x, t1.y = tom.y;
+        else if(t2.x == 0 && t2.y == 0) t2.x = tom.x, t2.y = tom.y;
+        else if(t3.x == 0 && t3.y == 0) t3.x = tom.x, t3.y = tom.y;
+        else if(t4.x == 0 && t4.y == 0) t4.x = tom.x, t4.y = tom.y;
+        else if(t5.x == 0 && t5.y == 0) t5.x = tom.x, t5.y = tom.y;
         game.mt_active++;
     }
 }
@@ -597,36 +597,12 @@ void tom_ob_check( void )
 
 void firework()
 {
-    int x,y;
-    // star
     fw.x = round(jerry.x);
     fw.y = round(jerry.y);
-    // bomb
-    x = round(tom.x);
-    y = round(tom.y);
-
-    double t1,t2,d;
-
-    t1 = x - fw.x;
-    t2 = y - fw.y;
-    if(fw.x > x)
-    {
-        t1 = fw.x - x;
-        t2 = fw.y - y;
-    }
-
-    d = sqrt(t1*t1 + t2*t2);
-
-    dx = t1 * .15 / d;
-    dy = t2 * .15 / d;
-
-    fw.x = round(dx + fw.x);
-    fw.y = round(dy + fw.y);
 }
 
 void firework_loop()
 {
-    if(fw.x == jerry.x) return;
     int x,y;
     // bomb
     x = round(tom.x);
@@ -639,8 +615,16 @@ void firework_loop()
 
     d = sqrt(t1*t1 + t2*t2);
 
-    dx = t1 * .15 / d;
-    dy = t2 * .15 / d;
+    draw_int(10, 7, t1);
+    draw_int(10, 8, t2);
+    draw_double(10, 9, d);
+    draw_double(10, 11, t1 * 1.5 / d);
+
+    dx = t1 * 1.5 / d;
+    dy = t2 * 1.5 / d;
+
+    draw_double(10, 13, dx);
+    draw_double(10, 14, dy);
 
     fw.x = round(dx + fw.x);
     fw.y = round(dy + fw.y);
@@ -658,9 +642,6 @@ void controller( void )
 
     collision_wall( key );
 
-    draw_int(10, 10, jerry.x);
-    draw_int(10, 11, jerry.y);
-
     if(!game.charswitch)
     {
         if(key == 'a' && jerry.x - 1 >= game.ob_x) jerry.x--;
@@ -676,6 +657,22 @@ void controller( void )
         else if (key == 'd' && tom.x + 1 < game.W) tom.x++;
         else if (key == 'w' && tom.y - 1 >= game.ob_y) tom.y--;
         else if (key == 's' && tom.y + 1 < game.H) tom.y++;
+        else if (key == 'm')
+        {
+            if(t1.x == 0 && t1.y == 0) t1.x = tom.x, t1.y = tom.y;
+            else if(t2.x == 0 && t2.y == 0) t2.x = tom.x, t2.y = tom.y;
+            else if(t3.x == 0 && t3.y == 0) t3.x = tom.x, t3.y = tom.y;
+            else if(t4.x == 0 && t4.y == 0) t4.x = tom.x, t4.y = tom.y;
+            else if(t5.x == 0 && t5.y == 0) t5.x = tom.x, t5.y = tom.y;
+        }
+        else if (key == 'c')
+        {
+            if(c1.x == 0 && c1.y == 0 && check_pixel(c1.x, c1.y)) c1.x = tom.x, c1.y = tom.y;
+            else if(c2.x == 0 && c2.y == 0 && check_pixel(c2.x, c2.y)) c2.x = tom.x, c2.y = tom.y;
+            else if(c3.x == 0 && c3.y == 0 && check_pixel(c3.x, c3.y)) c3.x = tom.x, c3.y = tom.y;
+            else if(c4.x == 0 && c4.y == 0 && check_pixel(c4.x, c4.y)) c4.x = tom.x, c4.y = tom.y;
+            else if(c5.x == 0 && c5.y == 0 && check_pixel(c5.x, c5.y)) c5.x = tom.x, c5.y = tom.y;
+        }
     }
 }
 
