@@ -330,13 +330,21 @@ void tom_ai( double wall_x, double wall_y )
     }
 }
 
+void firework()
+{
+    fw.x = round(jerry.x) == 0 ? round(jerry.x) + 1 : round(jerry.x);
+    fw.y = round(jerry.y);
+}
+
 int collect_cheese = 0;
 void jerry_ai( double wx, double wy )
 {
     // int near_wall = check_wall(wall_x, wall_y);
     if(floor(tom.x) == floor(jerry.x) && floor(tom.y) == floor(jerry.y)) game.score += 5, reset();
     if( game.pause ) return;
-    
+    if( game.currlvl > 1 && game.fw_active == 0) firework(), game.fw_active = 1;
+
+
     double tcx = 0;
     double tcy = 0;
 
@@ -352,12 +360,15 @@ void jerry_ai( double wx, double wy )
     if(tcx != 0 && tcy != 0) collect_cheese = 1;
 
 
+    draw_double(10, 10, tcx);
+    draw_double(10, 11, tcy);
+
     double d,dx,dy;
 
     d = sqrt(tcx*tcx + tcy* tcy);
 
-    dx = (tcx * .15 / d) / (PIXELCOUNT * .1);
-    dy = (tcy * .15 / d) / (PIXELCOUNT * .1);  
+    dx = (tcx * .15 / d) / (PIXELCOUNT * .125);
+    dy = (tcy * .15 / d) / (PIXELCOUNT * .125);  
 
     // Collision
 
@@ -365,6 +376,14 @@ void jerry_ai( double wx, double wy )
     else if(round(jerry.x - 1) == wx && round(jerry.y) == wy) jerry.x = round(jerry.x + 1);
     else if(round(jerry.y + 1) == wy && round(jerry.x) == wx) jerry.y = round(jerry.y - 1);
     else if(round(jerry.y - 1) == wy && round(jerry.x) == wx) jerry.y = round(jerry.y + 1);
+
+    else if(round(jerry.x + 2) == round(tom.x) && round(jerry.y) == round(tom.y)) jerry.x--;
+    else if(round(jerry.x - 2) == round(tom.x) && round(jerry.y) == round(tom.y)) jerry.x++;
+    else if(round(jerry.y + 1) == round(tom.x) && round(jerry.y) == round(tom.y)) jerry.y--;
+    else if(round(jerry.y - 1) == round(tom.x) && round(jerry.y) == round(tom.y)) jerry.y++;
+
+    
+
     if(collect_cheese)
     {
         jerry.x = dx + jerry.x;
@@ -457,11 +476,11 @@ void mt_render( void )
     }
     else // Tom
     {
-        if(jerry.x == t1.x && jerry.y == t1.y) t1.x = 0, t1.y = 0, game.mt_active--, game.score++, reset();
-        if(jerry.x == t2.x && jerry.y == t2.y) t2.x = 0, t2.y = 0, game.mt_active--, game.score++, reset();
-        if(jerry.x == t3.x && jerry.y == t3.y) t3.x = 0, t3.y = 0, game.mt_active--, game.score++, reset();
-        if(jerry.x == t4.x && jerry.y == t4.y) t4.x = 0, t4.y = 0, game.mt_active--, game.score++, reset();
-        if(jerry.x == t5.x && jerry.y == t5.y) t5.x = 0, t5.y = 0, game.mt_active--, game.score++, reset();
+        if(round(jerry.x) == t1.x && round(jerry.y) == t1.y) t1.x = 0, t1.y = 0, game.mt_active--, game.score++, reset();
+        if(round(jerry.x) == t2.x && round(jerry.y) == t2.y) t2.x = 0, t2.y = 0, game.mt_active--, game.score++, reset();
+        if(round(jerry.x) == t3.x && round(jerry.y) == t3.y) t3.x = 0, t3.y = 0, game.mt_active--, game.score++, reset();
+        if(round(jerry.x) == t4.x && round(jerry.y) == t4.y) t4.x = 0, t4.y = 0, game.mt_active--, game.score++, reset();
+        if(round(jerry.x) == t5.x && round(jerry.y) == t5.y) t5.x = 0, t5.y = 0, game.mt_active--, game.score++, reset();
     }
 }
 
@@ -476,8 +495,8 @@ void cheese_place( void )
         y = rand() % game.H;
         for(int i = 0; i < PIXELCOUNT; i++)
         {
-            if(x == wall_pixels[i][0]) x = x > game.W ? x + 1 : x - 1;
-            if(y == wall_pixels[i][1]) y = y > game.H ? y - game.ob_y * 2 : y + game.ob_y * 2;
+            if(x == wall_pixels[i][0] || x > game.W || x < game.ob_x) x = x > game.W ? x + 1 : x - 1;
+            if(y == wall_pixels[i][1] || y > game.H || y < game.ob_y) y = y > game.H ? y - game.ob_y * 2 : y + game.ob_y * 2;
         }
 
         if(y <= game.ob_y) y = y + game.ob_y;
@@ -510,8 +529,6 @@ int wall = 0;
 
 void collision_wall( char key )
 {
-    draw_double(20, 10, jerry.x);
-    draw_double(20, 11, jerry.y);
     calc_wall_pixels();
     for(int i = 0; i != PIXELCOUNT; i++)
     {
@@ -624,11 +641,6 @@ void tom_ob_check( void )
     if(tom.y > game.H - 1) {tom.y = game.H - 1;}
 }
 
-void firework()
-{
-    fw.x = round(jerry.x) == 0 ? round(jerry.x) + 1 : round(jerry.x);
-    fw.y = round(jerry.y);
-}
 
 void firework_loop()
 {
@@ -715,7 +727,7 @@ void game_logic_setup ( void )
 {   
     // Game conditions
     game.g_over = false;
-    game.score = 5;
+    game.score = 0;
     game.loop_delay = 10;
 
     game.pause = false;
