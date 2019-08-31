@@ -82,6 +82,9 @@ struct game_logic
     bool wall;
 } game;
 
+/*
+    Game objects that require X and Y interacitivty 
+*/
 struct gObj
 {
     int x;
@@ -108,7 +111,7 @@ struct character
 double walls[50][4]; // Walls initial position
 double walls_scaled[50][4]; // Walls scaled up to screen resolution
 double wall_pixels[PIXELCOUNT][2]; // Array holding x,y coordinate of each wall pixel. 0 = x, 1 = y
-double dx,dy;
+double dx,dy; // Delta X and Delta Y 
 
 /*
     Generic function that scales the walls up to the screen resoultion
@@ -339,10 +342,16 @@ void firework()
 int collect_cheese = 0;
 void jerry_ai( double wx, double wy )
 {
-    // int near_wall = check_wall(wall_x, wall_y);
     if(floor(tom.x) == floor(jerry.x) && floor(tom.y) == floor(jerry.y)) game.score += 5, reset();
     if( game.pause ) return;
     if( game.currlvl > 1 && game.fw_active == 0) firework(), game.fw_active = 1;
+    /*
+        * Failsafe check
+        Jerry showed unexepected behaviours when there were no cheese present on screen, after collecting his first and there was no secondary peice.
+        Jerrys X and Y would become nan. This was the simplist solution due to it occuring in a 1-2 second period and wouldn't interfere if the majority
+        of games
+    */
+    if( game.c_active == 0) return; 
 
 
     double tcx = 0;
@@ -358,10 +367,6 @@ void jerry_ai( double wx, double wy )
     else if(c4.x - jerry.x < c5.x - jerry.x && c4.y - jerry.y < c5.x - jerry.y) tcx = c5.x - jerry.x, tcy = c5.y - jerry.y;
 
     if(tcx != 0 && tcy != 0) collect_cheese = 1;
-
-
-    draw_double(10, 10, tcx);
-    draw_double(10, 11, tcy);
 
     double d,dx,dy;
 
@@ -846,13 +851,15 @@ void timer( void )
 void loop( void ) 
 {
     clear_screen();
+    draw_int(10, 7, jerry.x);
+    draw_int(10, 8, jerry.y);
+    draw_int(10, 11, scrape_char(10, 10));
     game.W = screen_width();
     game.H = screen_height();
 
     if(fw.x != 0 && fw.y != 0) firework_loop();
 
     if(game.lives <= 0) game.g_over = true;
-    draw_int(10, 15, game.firework);
     status_bar();
     draw_wall();
     controller();
