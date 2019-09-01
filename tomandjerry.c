@@ -291,12 +291,12 @@ void firework()
 
 int collect_cheese = 0;
 
+double tmp_x,tmp_y;
 
 void jerry_ai( void )
 {
     if(floor(tom.x) == floor(jerry.x) && floor(tom.y) == floor(jerry.y)) game.score += 5, reset();
     if( game.pause ) return;
-    if( game.currlvl > 1 && game.fw_active == 0) firework(), game.fw_active = 1;
     /*
         * Failsafe check
         Jerry showed unexepected behaviours when there were no cheese present on screen, after collecting his first and there was no secondary peice.
@@ -332,32 +332,28 @@ void jerry_ai( void )
     // Collision
 
     int jx,jy,tx,ty;
-    double t1,t2;
     jx = round(jerry.x);
     jy = round(jerry.y);
     tx = round(tom.x);
     ty = round(tom.y);
-    
-    t1 = jx - tx;
-    t2 = jy - ty;
-
-    double dist = t1+t2;
-    int dist_check = 4;
-
-    draw_double(10, 20, t1);
-    draw_double(10, 21, t2);
-    draw_double(10, 22, dist);
 
     if(scrape_char(jx + 1, jy) == '*') jerry.x = round(jerry.x - 1);
     else if(scrape_char(jx - 1, jy) == '*') jerry.x = round(jerry.x + 1);
     else if(scrape_char(jx, jy+ 1) == '*') jerry.y = round(jerry.y - 1);
     else if(scrape_char(jx, jy- 1) == '*') jerry.y = round(jerry.y + 1);
 
+    else if(jx - 1 == tx && jy == ty) jerry.x = round(jerry.x + 2);
+    else if(jx + 1 == tx && jy == ty) jerry.x = round(jerry.x - 2);
+    else if(jx == tx && jy - 1 == ty) jerry.y = round(jerry.y + 2);
+    else if(jx == tx && jy + 1 == ty) jerry.y = round(jerry.y - 2);
+
+
     d = sqrt(tcx*tcx + tcy* tcy);
-    dx = (tcx * .15 / d);
-    dy = (tcy * .15 / d);  
+    dx = (tcx * .25 / d);
+    dy = (tcy * .25 / d);  
     if(collect_cheese)
     {
+        // Movement calculation
         jerry.x = dx + jerry.x;
         jerry.y = dy + jerry.y;  
         if(round(jerry.x) == c1.x && round(jerry.y) == c1.y) c1.x = 0, c1.y = 0, game.c_active--;
@@ -366,6 +362,7 @@ void jerry_ai( void )
         else if(round(jerry.x) == c4.x && round(jerry.y) == c4.y) c4.x = 0, c4.y = 0, game.c_active--;
         else if(round(jerry.x) == c5.x && round(jerry.y) == c5.y) c5.x = 0, c5.y = 0, game.c_active--;
     }
+    if( game.currlvl > 1 && game.fw_active == 0) firework(), game.fw_active = 1;
 }
 
 void door_mechanic( void )
@@ -524,6 +521,8 @@ void collision_wall( char key )
         if(key == 'd' && scrape_char(round(x) + 1, y) == '*') tom.x = x - s;
         if(key == 'w' && scrape_char(round(x), round(y) - 1) == '*') tom.y = y + s;
         if(key == 's' && scrape_char(round(x), round(y) + 1) == '*') tom.y = y - s;
+        tom.x = round(tom.x);
+        tom.y = round(tom.y);
         jerry_ai(); // Calling TOMS ai
     }
 }
